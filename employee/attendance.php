@@ -36,6 +36,23 @@ if(isset($_POST['check_in']))
 
     if(mysqli_num_rows($already)==0)
     {
+        // Get employee's shift start time
+        $employeeShift = mysqli_fetch_assoc(mysqli_query($conn,"
+        SELECT shift_start_time FROM employees
+        WHERE id='$employee_id'
+        "));
+
+        $initialStatus = 'Present';
+
+        // Check if employee is late
+        if($employeeShift && !empty($employeeShift['shift_start_time']))
+        {
+            $shiftStart = date('H:i:s', strtotime($employeeShift['shift_start_time']));
+            if($currentTime > $shiftStart)
+            {
+                $initialStatus = 'Late';
+            }
+        }
 
         mysqli_query($conn,"
         INSERT INTO attendance
@@ -50,7 +67,7 @@ if(isset($_POST['check_in']))
             '$employee_id',
             '$today',
             '$currentTime',
-            'Present'
+            '$initialStatus'
         )
         ");
 
@@ -93,7 +110,31 @@ if(isset($_POST['check_out']))
 
         $workingHours = $hours." Hours ".$minutes." Minutes";
 
-        if($hours >= 8)
+        $status = $attendance['status']; // Keep existing status (Late/Present)
+
+        // Get employee's shift end time to check for early out
+        $employeeShift = mysqli_fetch_assoc(mysqli_query($conn,"
+        SELECT shift_end_time FROM employees
+        WHERE id='$employee_id'
+        "));
+
+        // Check if employee is checking out early
+        $isEarlyOut = false;
+        if($employeeShift && !empty($employeeShift['shift_end_time']))
+        {
+            $shiftEnd = date('H:i:s', strtotime($employeeShift['shift_end_time']));
+            if($currentTime < $shiftEnd)
+            {
+                $isEarlyOut = true;
+            }
+        }
+
+        // Determine final status based on hours and early out
+        if($isEarlyOut)
+        {
+            $status = "Early Out";
+        }
+        elseif($hours >= 8)
         {
             $status = "Present";
         }
@@ -103,7 +144,7 @@ if(isset($_POST['check_out']))
         }
         else
         {
-            $status = "Late";
+            $status = "Absent";
         }
 
         mysqli_query($conn,"

@@ -34,8 +34,8 @@
 
 </style>
 
-<button class="btn btn-dark"
-style="position:fixed;top:15px;right:20px;z-index:9999;"
+<button class="btn btn-dark dark-mode-control"
+style="<?php echo !empty($darkModeInTopbar) ? 'position:static;' : 'position:fixed;top:15px;right:20px;z-index:9999;'; ?>"
 onclick="toggleDarkMode()">
 🌙 Dark Mode
 </button>

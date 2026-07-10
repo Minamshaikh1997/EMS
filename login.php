@@ -1,68 +1,65 @@
-```php
 <?php
+
 session_start();
 include("config/db.php");
 
 $error = "";
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
     $email = mysqli_real_escape_string($conn, trim($_POST['email']));
-    $password = $_POST['password'];
+    $password = trim($_POST['password']);
 
-    // Try employee login first.
-    $query = "SELECT * FROM employees WHERE email='$email' LIMIT 1";
-    $result = mysqli_query($conn, $query);
+    // ==========================
+    // ADMIN LOGIN
+    // ==========================
+    $adminQuery = mysqli_query($conn, "SELECT * FROM admin WHERE email='$email' LIMIT 1");
 
-    if (mysqli_num_rows($result) === 1) {
-        $user = mysqli_fetch_assoc($result);
-        $validPassword = false;
+    if ($adminQuery && mysqli_num_rows($adminQuery) > 0) {
 
-        if (password_verify($password, $user['password'])) {
-            $validPassword = true;
-        } elseif ($password === $user['password']) {
-            $validPassword = true;
-            $newHash = password_hash($password, PASSWORD_DEFAULT);
-            mysqli_query($conn, "UPDATE employees SET password='$newHash' WHERE id='" . $user['id'] . "'");
-        }
+        $admin = mysqli_fetch_assoc($adminQuery);
 
-        if ($validPassword) {
-            if (isset($user['role']) && $user['role'] === 'Admin') {
-                $_SESSION['admin'] = $user['email'];
-                $_SESSION['admin_id'] = $user['id'];
-                $_SESSION['admin_role'] = 'Admin';
-                header("Location: admin/dashboard.php");
-                exit();
+        if (password_verify($password, $admin['password']) || $password == $admin['password']) {
+
+            if ($password == $admin['password']) {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                mysqli_query($conn, "UPDATE admin SET password='$hash' WHERE id='".$admin['id']."'");
             }
 
-            $_SESSION['employee'] = $user['email'];
-            $_SESSION['employee_id'] = $user['id'];
-            $_SESSION['employee_role'] = isset($user['role']) ? $user['role'] : 'Employee';
-            $_SESSION['employee_name'] = $user['full_name'];
-            header("Location: employee/dashboard.php");
+            $_SESSION['admin'] = $admin['email'];
+            $_SESSION['admin_id'] = $admin['id'];
+            $_SESSION['admin_name'] = $admin['name'];
+            $_SESSION['admin_role'] = "Admin";
+
+            
+
+            header("Location: admin/dashboard.php");
             exit();
         }
     }
 
-    // Fallback: allow legacy admin table login.
-    $query = "SELECT * FROM admin WHERE email='$email' LIMIT 1";
-    $result = mysqli_query($conn, $query);
-    if (mysqli_num_rows($result) === 1) {
-        $user = mysqli_fetch_assoc($result);
-        $validPassword = false;
+    // ==========================
+    // EMPLOYEE LOGIN
+    // ==========================
+    $empQuery = mysqli_query($conn, "SELECT * FROM employees WHERE email='$email' LIMIT 1");
 
-        if (password_verify($password, $user['password'])) {
-            $validPassword = true;
-        } elseif ($password === $user['password']) {
-            $validPassword = true;
-            $newHash = password_hash($password, PASSWORD_DEFAULT);
-            mysqli_query($conn, "UPDATE admin SET password='$newHash' WHERE id='" . $user['id'] . "'");
-        }
+    if ($empQuery && mysqli_num_rows($empQuery) > 0) {
 
-        if ($validPassword) {
-            $_SESSION['admin'] = $user['email'];
-            $_SESSION['admin_id'] = $user['id'];
-            $_SESSION['admin_role'] = isset($user['role']) ? $user['role'] : 'Admin';
-            header("Location: admin/dashboard.php");
+        $emp = mysqli_fetch_assoc($empQuery);
+
+        if (password_verify($password, $emp['password']) || $password == $emp['password']) {
+
+            if ($password == $emp['password']) {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                mysqli_query($conn, "UPDATE employees SET password='$hash' WHERE id='".$emp['id']."'");
+            }
+
+            $_SESSION['employee'] = $emp['email'];
+            $_SESSION['employee_id'] = $emp['id'];
+            $_SESSION['employee_name'] = $emp['full_name'];
+            $_SESSION['employee_role'] = $emp['role'];
+
+            header("Location: employee/dashboard.php");
             exit();
         }
     }
@@ -70,47 +67,28 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $error = "Invalid Email or Password";
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Employee Leave System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background: #f4f6f9; }
-        .login-box { max-width: 420px; margin: 80px auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,.1); }
-        .login-box h2 { text-align: center; margin-bottom: 25px; }
-    </style>
-</head>
-<body>
-<?php include("dark_mode.php"); ?>
-<div class="login-box">
-    <h2>Employee Leave System</h2>
 
-    <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-    <?php endif; ?>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <form method="POST">
-        <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-control" required>
-        </div>
+<title>Employee Leave System</title>
 
-        <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" name="password" class="form-control" required>
-        </div>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 
-        <button type="submit" class="btn btn-primary w-100">Login</button>
-    </form>
-    <div class="mt-3 text-center">
-        <a href="admin/login.php">Admin Login</a>
-    </div>
-</div>
-</body>
-</html>
+<style>
 
-```
+body{
+    background:linear-gradient(135deg,#0f172a,#2563eb);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+.login-card{
+    width:420

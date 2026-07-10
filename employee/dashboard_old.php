@@ -22,12 +22,8 @@ $photo = !empty($employee['photo']) ? $employee['photo'] : 'default.png';
 $totalLeaves = 0;
 $approvedLeaves = 0;
 $pendingLeaves = 0;
-$rejectedLeaves = 0;
 $today = date('Y-m-d');
 $attendanceStatus = 'Absent';
-$checkInTime = '—';
-$checkOutTime = '—';
-$workingHours = '—';
 
 $leaveCounts = mysqli_query($conn, "SELECT status, COUNT(*) AS cnt FROM leave_requests WHERE employee_id='$employee_id' GROUP BY status");
 if ($leaveCounts) {
@@ -37,8 +33,6 @@ if ($leaveCounts) {
             $approvedLeaves = $row['cnt'];
         } elseif ($row['status'] === 'Pending') {
             $pendingLeaves = $row['cnt'];
-        } elseif ($row['status'] === 'Rejected') {
-            $rejectedLeaves = $row['cnt'];
         }
     }
 }
@@ -47,25 +41,7 @@ $todayAttendance = mysqli_query($conn, "SELECT * FROM attendance WHERE employee_
 if ($todayAttendance && mysqli_num_rows($todayAttendance) > 0) {
     $attendance = mysqli_fetch_assoc($todayAttendance);
     $attendanceStatus = $attendance['status'] ?? 'Present';
-    $checkInTime = !empty($attendance['check_in']) ? date('h:i A', strtotime($attendance['check_in'])) : '—';
-    $checkOutTime = !empty($attendance['check_out']) ? date('h:i A', strtotime($attendance['check_out'])) : '—';
-    $workingHours = !empty($attendance['working_hours']) ? $attendance['working_hours'] : '—';
 }
-
-$balanceQuery = mysqli_query($conn, "SELECT * FROM leave_balance WHERE employee_id='$employee_id' LIMIT 1");
-if ($balanceQuery && mysqli_num_rows($balanceQuery) === 0) {
-    mysqli_query($conn, "INSERT INTO leave_balance (employee_id, casual_leave, sick_leave, annual_leave) VALUES ('$employee_id', 12, 10, 20)");
-    $balanceQuery = mysqli_query($conn, "SELECT * FROM leave_balance WHERE employee_id='$employee_id' LIMIT 1");
-}
-$leaveBalance = ($balanceQuery) ? mysqli_fetch_assoc($balanceQuery) : ['casual_leave' => 0, 'sick_leave' => 0, 'annual_leave' => 0];
-
-$latestNotices = mysqli_query($conn, "SELECT * FROM notices ORDER BY id DESC LIMIT 5");
-$upcomingHolidays = mysqli_query($conn, "
-    SELECT * FROM holidays
-    WHERE holiday_date >= CURDATE()
-    ORDER BY holiday_date ASC
-    LIMIT 5
-");
 
 $shiftLabel = !empty($employee['shift_name']) ? $employee['shift_name'] : 'Morning';
 $shiftStart = !empty($employee['shift_start_time']) ? date('H:i', strtotime($employee['shift_start_time'])) : '09:00';
@@ -596,58 +572,10 @@ $shiftEnd = !empty($employee['shift_end_time']) ? date('H:i', strtotime($employe
     <div class="col-lg-3 col-md-6">
         <div class="stat-card stat-red">
             <div class="stat-icon">
-                <i class="fas fa-times-circle"></i>
+                <i class="fas fa-user-clock"></i>
             </div>
-            <div class="stat-label">Rejected</div>
-            <div class="stat-value"><?php echo $rejectedLeaves; ?></div>
-        </div>
-    </div>
-</div>
-
-<!-- Feature Cards -->
-<div class="row mt-2">
-    <div class="col-lg-4">
-        <div class="feature-card h-100">
-            <div class="card-header">
-                <i class="fas fa-business-time"></i> Shift Information
-            </div>
-            <div class="card-body">
-                <p class="feature-title">Your Shift</p>
-                <p><strong><?php echo htmlspecialchars($shiftLabel); ?></strong></p>
-                <p><?php echo $shiftStart; ?> – <?php echo $shiftEnd; ?></p>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="feature-card h-100">
-            <div class="card-header">
-                <i class="fas fa-chart-pie"></i> Leave Balance
-            </div>
-            <div class="card-body">
-                <p><strong>Casual:</strong> <?php echo (int)$leaveBalance['casual_leave']; ?> days</p>
-                <p><strong>Sick:</strong> <?php echo (int)$leaveBalance['sick_leave']; ?> days</p>
-                <p><strong>Annual:</strong> <?php echo (int)$leaveBalance['annual_leave']; ?> days</p>
-                <a href="leave_balance.php" class="btn btn-sm btn-outline-primary mt-2">View Details</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <div class="feature-card h-100">
-            <div class="card-header">
-                <i class="fas fa-user-clock"></i> Today's Attendance
-            </div>
-            <div class="card-body">
-                <p class="feature-title">Status</p>
-                <p><strong><?php echo htmlspecialchars($attendanceStatus); ?></strong></p>
-                <p><strong>Check-in:</strong> <?php echo $checkInTime; ?></p>
-                <p><strong>Check-out:</strong> <?php echo $checkOutTime; ?></p>
-                <?php if ($workingHours !== '—'): ?>
-                    <p><strong>Hours:</strong> <?php echo htmlspecialchars($workingHours); ?></p>
-                <?php endif; ?>
-                <a href="attendance.php" class="btn btn-sm btn-outline-success mt-2">Mark Attendance</a>
-            </div>
+            <div class="stat-label">Today's Attendance</div>
+            <div class="stat-value" style="font-size: 18px;"><?php echo $attendanceStatus; ?></div>
         </div>
     </div>
 </div>
@@ -674,51 +602,6 @@ $shiftEnd = !empty($employee['shift_end_time']) ? date('H:i', strtotime($employe
         <a href="leave_balance.php" class="menu-btn btn-balance">
             <i class="fas fa-chart-pie"></i> Leave Balance
         </a>
-    </div>
-</div>
-
-<!-- Notices & Holidays -->
-<div class="row mt-4">
-    <div class="col-lg-6">
-        <div class="recent-section h-100">
-            <h5><i class="fas fa-bullhorn"></i> Latest Notices</h5>
-            <?php if ($latestNotices && mysqli_num_rows($latestNotices) > 0): ?>
-                <?php while ($notice = mysqli_fetch_assoc($latestNotices)): ?>
-                    <div class="border-bottom mb-3 pb-2">
-                        <h6><?php echo htmlspecialchars($notice['title']); ?></h6>
-                        <p class="mb-1"><?php echo htmlspecialchars($notice['notice']); ?></p>
-                        <?php if (!empty($notice['created_at'])): ?>
-                            <small class="text-muted"><?php echo date('d-m-Y', strtotime($notice['created_at'])); ?></small>
-                        <?php endif; ?>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    No notices available
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <div class="col-lg-6">
-        <div class="recent-section h-100">
-            <h5><i class="fas fa-umbrella-beach"></i> Upcoming Holidays</h5>
-            <?php if ($upcomingHolidays && mysqli_num_rows($upcomingHolidays) > 0): ?>
-                <?php while ($holiday = mysqli_fetch_assoc($upcomingHolidays)): ?>
-                    <div class="border-bottom mb-3 pb-2">
-                        <h6><?php echo htmlspecialchars($holiday['holiday_name']); ?></h6>
-                        <p class="mb-1"><?php echo htmlspecialchars($holiday['description'] ?? ''); ?></p>
-                        <small class="text-muted"><?php echo date('d-m-Y', strtotime($holiday['holiday_date'])); ?></small>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="empty-state">
-                    <i class="fas fa-calendar"></i>
-                    No upcoming holidays
-                </div>
-            <?php endif; ?>
-        </div>
     </div>
 </div>
 
