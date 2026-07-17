@@ -181,8 +181,9 @@ $months = [
 </form>
 
 <a href="payroll_dashboard.php" class="btn btn-secondary">
-<i class="fa fa-arrow-left"></i> Back
+<i class="fa fa-arrow-left"></i> Back to Payroll
 </a>
+<a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 
 </div>
 </div>

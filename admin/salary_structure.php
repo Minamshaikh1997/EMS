@@ -76,7 +76,7 @@ if (isset($_POST['save'])) {
 }
 
 // Employee List
-$employees = mysqli_query($conn, "SELECT id, employee_id, full_name FROM employees ORDER BY full_name ASC");
+$employees = mysqli_query($conn, "SELECT id, employee_id, full_name, role FROM employees ORDER BY full_name ASC");
 
 // Salary Components
 $allowanceComponents = mysqli_query($conn, "
@@ -100,6 +100,7 @@ $salaryList = mysqli_query($conn, "
         s.basic_salary,
         e.employee_id,
         e.full_name,
+        e.role,
 
         IFNULL((
             SELECT SUM(ssc.amount)
@@ -271,7 +272,7 @@ if (isset($message)) {
 
 <?php while($emp = mysqli_fetch_assoc($employees)){ ?>
 <option value="<?php echo $emp['id']; ?>">
-<?php echo $emp['employee_id']; ?> - <?php echo $emp['full_name']; ?>
+<?php echo $emp['employee_id']; ?> - <?php echo $emp['full_name']; ?> (<?php echo htmlspecialchars($emp['role'] ?? 'Employee'); ?>)
 </option>
 <?php } ?>
 
@@ -369,6 +370,7 @@ placeholder="Search Employee...">
 <tr>
 <th>Employee ID</th>
 <th>Name</th>
+<th>Role</th>
 <th>Basic</th>
 <th>Allowance</th>
 <th>Deduction</th>
@@ -393,6 +395,7 @@ $net = $gross - $deduction;
 
 <td><?php echo $row['employee_id']; ?></td>
 <td><?php echo $row['full_name']; ?></td>
+<td><?php echo htmlspecialchars($row['role'] ?? 'Employee'); ?></td>
 <td><?php echo number_format($row['basic_salary'], 2); ?></td>
 <td><?php echo number_format($allowance, 2); ?></td>
 <td><?php echo number_format($deduction, 2); ?></td>

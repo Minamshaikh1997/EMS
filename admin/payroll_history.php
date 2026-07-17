@@ -16,7 +16,7 @@ if(isset($_GET['paid']))
 
     mysqli_query($conn,"
     UPDATE payroll
-    SET status='Paid'
+    SET payment_status='Paid'
     WHERE id='$id'
     ");
 
@@ -126,7 +126,9 @@ Payroll History
 
 <?php
 
-if($row['status']=="Paid")
+$status = $row['payment_status'] ?? 'Pending';
+
+if($status == "Paid")
 {
     echo "<span class='badge bg-success'>Paid</span>";
 }
@@ -141,7 +143,7 @@ else
 
 <td>
 
-<?php if($row['status']=="Pending"){ ?>
+<?php if($row['payment_status']=="Pending"){ ?>
 
 <a
 href="payroll_history.php?paid=<?=$row['id']?>"
@@ -179,6 +181,10 @@ Completed
 
 </div>
 
+</div>
+
+<div class="text-center mt-3 mb-4">
+    <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 </div>
 
 </body>

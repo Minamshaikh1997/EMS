@@ -141,9 +141,7 @@ Reject
 </div>
 
 <div class="mb-3">
-    <a href="dashboard.php" class="btn btn-primary">
-        ← Back
-    </a>
+    <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 </div>	
 
 </div>

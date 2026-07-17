@@ -138,11 +138,7 @@ Leave Balance
 
 <br>
 
-<a href="dashboard.php" class="btn btn-secondary">
-
-Back Dashboard
-
-</a>
+<a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 
 </div>
 

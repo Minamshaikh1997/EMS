@@ -265,5 +265,9 @@ for ($i = 0; $i < $maxRows; $i++) {
 
 </div>
 
+<div class="text-center mt-3">
+    <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
+</div>
+
 </body>
 </html>

@@ -93,9 +93,8 @@ value="<?php echo $row['designation']; ?>" required>
 Update Profile
 </button>
 
-<a href="profile.php" class="btn btn-secondary">
-Back
-</a>
+<a href="profile.php" class="btn btn-secondary">Back to Profile</a>
+<a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 
 </form>
 

@@ -150,9 +150,7 @@ if(isset($msg))
 Apply Leave
 </button>
 
-<a href="dashboard.php" class="btn btn-secondary">
-Back
-</a>
+<a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 
 </form>
 

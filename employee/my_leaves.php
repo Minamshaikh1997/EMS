@@ -53,9 +53,7 @@ $result = mysqli_query($conn,"SELECT * FROM leave_requests WHERE $where ORDER BY
 
 <div class="card-body">
 
-<a href="dashboard.php" class="btn btn-primary mb-3">
-Back Dashboard
-</a>
+<a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 
 <form method="GET" class="row mb-3">
 
@@ -178,6 +176,10 @@ else
 
 </div>
 
+</div>
+
+<div class="text-center mt-3 mb-4">
+    <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
 </div>
 
 </body>

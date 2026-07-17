@@ -193,8 +193,12 @@ $totalNet += $netSalary;
 <td><?php echo number_format($deductions, 2); ?></td>
 <td class="text-primary fw-bold"><?php echo number_format($netSalary, 2); ?></td>
 <td>
-<span class="badge bg-success">
-<?php echo isset($row['status']) ? $row['status'] : "Generated"; ?>
+<?php
+$payStatus = $row['payment_status'] ?? 'Generated';
+$badgeClass = ($payStatus == 'Paid') ? 'bg-success' : 'bg-warning text-dark';
+?>
+<span class="badge <?php echo $badgeClass; ?>">
+<?php echo $payStatus; ?>
 </span>
 </td>
 </tr>

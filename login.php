@@ -29,9 +29,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['admin'] = $admin['email'];
             $_SESSION['admin_id'] = $admin['id'];
             $_SESSION['admin_name'] = $admin['name'];
-            $_SESSION['admin_role'] = "Admin";
-
-            
+            $_SESSION['admin_role'] = isset($admin['role']) && !empty($admin['role']) ? $admin['role'] : 'Admin';
 
             header("Location: admin/dashboard.php");
             exit();
@@ -92,3 +90,8 @@ body{
 
 .login-card{
     width:420
+
+</div>
+
+</body>
+</html>
