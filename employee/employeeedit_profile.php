@@ -6,12 +6,6 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Only users with role 'HR' can edit profiles here
-if (!isset($_SESSION['employee_role']) || $_SESSION['employee_role'] !== 'HR') {
-    header("Location: profile.php");
-    exit();
-}
-
 include("../config/db.php");
 
 $employee_id = $_SESSION['employee_id'];

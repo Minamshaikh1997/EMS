@@ -96,145 +96,9 @@ $designation = $employee['designation'] ?? $employee_role;
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="../admin/admin_panel.css" rel="stylesheet">
 <style>
-:root {
-    --primary: #2563eb;
-    --primary-dark: #1d4ed8;
-    --primary-light: #60a5fa;
-    --secondary: #64748b;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --info: #06b6d4;
-    --dark: #0f172a;
-    --gray-50: #f8fafc;
-    --gray-100: #f1f5f9;
-    --gray-200: #e2e8f0;
-    --gray-300: #cbd5e1;
-    --gray-400: #94a3b8;
-    --gray-500: #64748b;
-    --gray-600: #475569;
-    --gray-700: #334155;
-    --gray-800: #1e293b;
-    --gray-900: #0f172a;
-    --radius: 16px;
-    --radius-sm: 10px;
-    --radius-xs: 8px;
-    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
-    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: var(--gray-50);
-    color: var(--gray-800);
-    min-height: 100vh;
-    padding: 0;
-}
-
-/* ===== TOP NAV ===== */
-.top-nav {
-    background: rgba(255,255,255,.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--gray-200);
-    padding: 0 32px;
-    height: 68px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 1050;
-}
-
-.top-nav-left {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.top-nav-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-decoration: none;
-}
-
-.top-nav-brand .brand-icon {
-    width: 38px;
-    height: 38px;
-    background: linear-gradient(135deg, var(--primary), #7c3aed);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    color: white;
-}
-
-.top-nav-brand .brand-text {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--gray-900);
-    letter-spacing: -.5px;
-}
-
-.top-nav-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.top-nav-date {
-    font-size: 13px;
-    color: var(--gray-500);
-    font-weight: 500;
-    padding: 6px 14px;
-    background: var(--gray-100);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.top-nav-user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px 6px 10px;
-    background: rgba(37,99,235,.08);
-    border-radius: 100px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--primary);
-}
-
-.top-nav-user .user-avatar-small {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--primary), #7c3aed);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 12px;
-}
-
-/* ===== PAGE CONTAINER ===== */
-.page-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 28px 32px;
-}
-
-/* ===== WELCOME BANNER ===== */
+/* Employee dashboard specific styles */
 .welcome-banner {
     background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 40%, #7c3aed 100%);
     border-radius: var(--radius);
@@ -312,7 +176,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 10px 20px;
-    border-radius: var(--radius-xs);
+    border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
@@ -332,76 +196,6 @@ body {
 .btn-banner-danger { background: rgba(239,68,68,.7); }
 .btn-banner-danger:hover { background: rgba(239,68,68,.9); }
 
-/* ===== SECTION ===== */
-.section-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.section-title i { color: var(--primary); }
-
-/* ===== STATS GRID ===== */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
-}
-
-.stat-card {
-    background: white;
-    border-radius: var(--radius);
-    padding: 22px;
-    border: 1px solid var(--gray-200);
-    box-shadow: var(--shadow);
-    transition: all .3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-}
-
-.stat-card .stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    margin-bottom: 14px;
-}
-
-.stat-card .stat-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    margin-bottom: 2px;
-}
-
-.stat-card .stat-value {
-    font-size: 26px;
-    font-weight: 800;
-    color: var(--gray-900);
-    line-height: 1.2;
-}
-
-.stat-primary .stat-icon { background: rgba(37,99,235,.12); color: var(--primary); }
-.stat-success .stat-icon { background: rgba(16,185,129,.12); color: var(--success); }
-.stat-warning .stat-icon { background: rgba(245,158,11,.12); color: var(--warning); }
-.stat-danger .stat-icon { background: rgba(239,68,68,.12); color: var(--danger); }
-
-/* ===== FEATURE CARDS ===== */
 .feature-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -418,10 +212,7 @@ body {
     transition: all .3s ease;
 }
 
-.feature-card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--gray-300);
-}
+.feature-card:hover { box-shadow: var(--shadow-md); border-color: var(--gray-300); }
 
 .feature-card .fc-header {
     padding: 16px 20px;
@@ -436,35 +227,21 @@ body {
 }
 
 .feature-card .fc-header i { font-size: 16px; }
-
 .fc-header-primary i { color: var(--primary); }
 .fc-header-success i { color: var(--success); }
 .fc-header-info i { color: var(--info); }
 
-.feature-card .fc-body {
-    padding: 20px;
-}
-
+.feature-card .fc-body { padding: 20px; }
 .feature-card .fc-body .fc-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    margin-bottom: 8px;
+    font-size: 11px; font-weight: 700; color: var(--gray-400);
+    text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
 }
 
 .feature-card .fc-body .fc-value {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--gray-800);
-    margin-bottom: 4px;
+    font-size: 15px; font-weight: 600; color: var(--gray-800); margin-bottom: 4px;
 }
 
-.feature-card .fc-body .fc-sub {
-    font-size: 13px;
-    color: var(--gray-500);
-}
+.feature-card .fc-body .fc-sub { font-size: 13px; color: var(--gray-500); }
 
 .feature-card .fc-body .fc-link {
     margin-top: 12px;
@@ -476,41 +253,29 @@ body {
     color: var(--primary);
     text-decoration: none;
     padding: 6px 14px;
-    border-radius: var(--radius-xs);
+    border-radius: 8px;
     background: rgba(37,99,235,.08);
     transition: all .2s ease;
 }
 
-.feature-card .fc-body .fc-link:hover {
-    background: rgba(37,99,235,.15);
-}
+.feature-card .fc-body .fc-link:hover { background: rgba(37,99,235,.15); }
 
-/* ===== LEAVE BALANCE BAR ===== */
 .leave-bar-group { margin-top: 8px; }
 .leave-bar-item { margin-bottom: 10px; }
 .leave-bar-item:last-child { margin-bottom: 0; }
 .leave-bar-item .lbl-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gray-600);
-    margin-bottom: 4px;
+    display: flex; justify-content: space-between;
+    font-size: 12px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px;
 }
 .leave-bar-item .lbl-row span:last-child { color: var(--gray-900); }
 .leave-bar-item .bar-track {
-    height: 6px;
-    background: var(--gray-100);
-    border-radius: 100px;
-    overflow: hidden;
+    height: 6px; background: var(--gray-100);
+    border-radius: 100px; overflow: hidden;
 }
 .leave-bar-item .bar-fill {
-    height: 100%;
-    border-radius: 100px;
-    transition: width .6s ease;
+    height: 100%; border-radius: 100px; transition: width .6s ease;
 }
 
-/* ===== QUICK MENU GRID ===== */
 .menu-section {
     background: white;
     border-radius: var(--radius);
@@ -518,6 +283,73 @@ body {
     box-shadow: var(--shadow);
     padding: 24px;
     margin-bottom: 28px;
+}
+
+.section-title {
+    font-size: 16px; font-weight: 700; color: var(--gray-900);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 16px;
+}
+.section-title i { color: var(--primary); }
+
+/* ===== STATS GRID ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: var(--radius);
+    border: 1px solid var(--gray-200);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: all .3s ease;
+}
+
+.stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.stat-icon i { font-size: 20px; }
+
+.stat-primary .stat-icon { background: rgba(37,99,235,.12); color: var(--primary); }
+.stat-success .stat-icon { background: rgba(16,185,129,.12); color: var(--success); }
+.stat-warning .stat-icon { background: rgba(245,158,11,.12); color: var(--warning); }
+.stat-danger .stat-icon { background: rgba(239,68,68,.12); color: var(--danger); }
+.stat-secondary .stat-icon { background: rgba(100,116,139,.12); color: var(--secondary); }
+
+.stat-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--gray-900);
+    line-height: 1;
 }
 
 .menu-grid {
@@ -528,42 +360,25 @@ body {
 }
 
 .menu-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 20px 12px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 10px; padding: 20px 12px;
     border-radius: var(--radius-sm);
-    text-decoration: none;
-    transition: all .25s ease;
-    border: 1px solid var(--gray-200);
-    background: white;
-    color: var(--gray-700);
+    text-decoration: none; transition: all .25s ease;
+    border: 1px solid var(--gray-200); background: white; color: var(--gray-700);
 }
 
 .menu-item:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary);
-    color: var(--gray-700);
-    text-decoration: none;
+    transform: translateY(-3px); box-shadow: var(--shadow-md);
+    border-color: var(--primary); color: var(--gray-700); text-decoration: none;
 }
 
 .menu-item .menu-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
+    width: 50px; height: 50px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
 }
 
 .menu-item .menu-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gray-600);
-    text-align: center;
+    font-size: 12px; font-weight: 600; color: var(--gray-600); text-align: center;
 }
 
 .mi-attendance .menu-icon { background: rgba(37,99,235,.12); color: var(--primary); }
@@ -575,208 +390,34 @@ body {
 .mi-password .menu-icon { background: rgba(239,68,68,.12); color: var(--danger); }
 .mi-balance .menu-icon { background: rgba(16,185,129,.12); color: var(--success); }
 
-/* ===== NOTICES / HOLIDAYS ===== */
-.content-card {
-    background: white;
-    border-radius: var(--radius);
-    border: 1px solid var(--gray-200);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    height: 100%;
-    transition: all .3s ease;
-}
-
-.content-card:hover { box-shadow: var(--shadow-md); }
-
-.content-card .cc-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--gray-800);
-    background: var(--gray-50);
-}
-
-.content-card .cc-header i { font-size: 16px; }
-.cc-header-primary i { color: var(--primary); }
-.cc-header-success i { color: var(--success); }
-
-.content-card .cc-body {
-    padding: 16px 20px;
-}
-
-.list-item {
-    padding: 12px 0;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.list-item:last-child { border-bottom: none; }
-
-.list-item h6 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--gray-800);
-    margin-bottom: 2px;
-}
-
-.list-item p {
-    font-size: 13px;
-    color: var(--gray-500);
-    margin-bottom: 2px;
-    line-height: 1.5;
-}
-
-.list-item small {
-    font-size: 11px;
-    color: var(--gray-400);
-}
-
-/* ===== TABLES ===== */
-.table-modern {
-    margin-bottom: 0;
-}
-
-.table-modern thead th {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    padding: 12px 16px;
-    border-bottom: 2px solid var(--gray-200);
-    background: transparent;
-}
-
-.table-modern tbody td {
-    padding: 12px 16px;
-    font-size: 13px;
-    color: var(--gray-700);
-    border-bottom: 1px solid var(--gray-100);
-    vertical-align: middle;
-}
-
-.table-modern tbody tr:hover { background: var(--gray-50); }
-.table-modern tbody tr:last-child td { border-bottom: none; }
-
-.badge-modern {
-    padding: 4px 12px;
-    border-radius: 100px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .3px;
-}
-
-.badge-approved { background: rgba(16,185,129,.12); color: #059669; }
-.badge-pending { background: rgba(245,158,11,.12); color: #d97706; }
-.badge-rejected { background: rgba(239,68,68,.12); color: #dc2626; }
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-    text-align: center;
-    padding: 32px 20px;
-    color: var(--gray-400);
-}
-
-.empty-state i {
-    font-size: 36px;
-    margin-bottom: 10px;
-    display: block;
-}
-
-.empty-state p { font-size: 14px; margin: 0; }
-
-/* ===== FOOTER ===== */
-.footer {
-    text-align: center;
-    padding: 32px 0 12px;
-    font-size: 13px;
-    color: var(--gray-400);
-}
-
-/* ===== DARK MODE ===== */
-body.dark-mode {
-    background: #0f172a;
-    color: #e2e8f0;
-}
-
-.dark-mode .top-nav {
-    background: rgba(30,41,59,.95);
-    border-bottom-color: rgba(255,255,255,.08);
-}
-
-.dark-mode .top-nav-brand .brand-text { color: #f1f5f9; }
-.dark-mode .top-nav-date { background: rgba(255,255,255,.06); color: var(--gray-400); }
-.dark-mode .top-nav-user { background: rgba(37,99,235,.2); }
-
-.dark-mode .stat-card,
+/* Dark mode overrides */
+.dark-mode .welcome-banner { box-shadow: 0 8px 32px rgba(37,99,235,.4); }
 .dark-mode .feature-card,
-.dark-mode .menu-section,
-.dark-mode .content-card,
-.dark-mode .menu-item {
-    background: #1e293b;
-    border-color: rgba(255,255,255,.08);
-}
-
-.dark-mode .stat-card .stat-value { color: #f1f5f9; }
+.dark-mode .menu-section { background: #1e293b; border-color: rgba(255,255,255,.08); }
 .dark-mode .feature-card .fc-header,
-.dark-mode .content-card .cc-header {
-    background: rgba(255,255,255,.04);
-    border-color: rgba(255,255,255,.08);
-    color: #e2e8f0;
-}
+.dark-mode .content-card .cc-header { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); color: #e2e8f0; }
 .dark-mode .feature-card .fc-body .fc-value { color: #e2e8f0; }
 .dark-mode .feature-card .fc-body .fc-sub { color: var(--gray-400); }
-
-.dark-mode .table-modern thead th { color: var(--gray-400); border-color: rgba(255,255,255,.08); }
-.dark-mode .table-modern tbody td { color: #cbd5e1; border-color: rgba(255,255,255,.06); }
-.dark-mode .table-modern tbody tr:hover { background: rgba(255,255,255,.04); }
-
 .dark-mode .section-title { color: #e2e8f0; }
-
-.dark-mode .list-item { border-color: rgba(255,255,255,.06); }
-.dark-mode .list-item h6 { color: #e2e8f0; }
-.dark-mode .list-item p { color: var(--gray-400); }
-
-.dark-mode .menu-item { color: var(--gray-300); }
+.dark-mode .menu-item { background: #1e293b; border-color: rgba(255,255,255,.08); color: var(--gray-300); }
 .dark-mode .menu-item:hover { border-color: var(--primary); }
 .dark-mode .menu-item .menu-label { color: var(--gray-400); }
-
 .dark-mode .leave-bar-item .bar-track { background: rgba(255,255,255,.08); }
 .dark-mode .leave-bar-item .lbl-row span:last-child { color: #e2e8f0; }
 
-/* ===== RESPONSIVE ===== */
+/* Responsive */
 @media (max-width: 991px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .feature-row { grid-template-columns: 1fr; }
     .menu-grid { grid-template-columns: repeat(2, 1fr); }
-    .page-container { padding: 20px; }
-    .top-nav { padding: 0 20px; }
     .welcome-banner { padding: 24px; }
     .welcome-banner-content { flex-wrap: wrap; }
     .banner-actions { margin-left: 0; width: 100%; }
-    .top-nav-date { display: none; }
 }
-
 @media (max-width: 768px) {
-    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .stat-card { padding: 16px; }
-    .stat-card .stat-value { font-size: 22px; }
     .welcome-banner .profile-img { width: 56px; height: 56px; }
     .welcome-banner .welcome-text h2 { font-size: 20px; }
 }
-
 @media (max-width: 480px) {
-    .page-container { padding: 14px; }
-    .top-nav { padding: 0 14px; height: 60px; }
-    .top-nav-user span { display: none; }
-    .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .stat-card { padding: 14px; }
-    .stat-card .stat-value { font-size: 20px; }
-    .stat-card .stat-icon { width: 36px; height: 36px; font-size: 15px; }
     .menu-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
     .menu-item { padding: 14px 8px; }
     .menu-item .menu-icon { width: 40px; height: 40px; font-size: 18px; }
@@ -787,311 +428,347 @@ body.dark-mode {
 </head>
 <body>
 
-<!-- Top Navigation -->
-<nav class="top-nav">
-    <div class="top-nav-left">
-        <a href="dashboard.php" class="top-nav-brand">
-            <div class="brand-icon"><i class="fa-solid fa-building"></i></div>
-            <div class="brand-text">EMS</div>
-        </a>
-    </div>
-    <div class="top-nav-right">
-        <span class="top-nav-date"><i class="fa-regular fa-calendar"></i> <?=date('d M Y')?></span>
-        <span class="top-nav-user">
-            <div class="user-avatar-small"><?php echo strtoupper(substr($employee_name, 0, 1)); ?></div>
-            <span><?php echo htmlspecialchars($employee_name); ?></span>
-        </span>
-        <?php include("../dark_mode.php"); ?>
-        <a href="logout.php" class="btn btn-danger btn-sm rounded-pill px-3">
-            <i class="fa fa-sign-out-alt"></i> <span>Logout</span>
-        </a>
-    </div>
-</nav>
+<!-- Sidebar Backdrop -->
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-<!-- Page Container -->
-<div class="page-container">
-
-    <!-- Welcome Banner -->
-    <div class="welcome-banner">
-        <div class="welcome-banner-content">
-            <img src="../uploads/<?php echo $photo; ?>" alt="Profile" class="profile-img" onerror="this.src='https://ui-avatars.com/api/?name=<?=urlencode($employee_name)?>&background=2563eb&color=fff&size=72'">
-            <div class="welcome-text">
-                <h2>Welcome back, <?php echo htmlspecialchars($employee_name); ?>! 👋</h2>
-                <p>Designation: <strong><?php echo htmlspecialchars($designation); ?></strong></p>
-            </div>
-            <div class="banner-actions">
-                <a href="edit_profile.php" class="btn-banner btn-banner-primary"><i class="fas fa-edit"></i> Edit Profile</a>
-                <a href="upload_photo.php" class="btn-banner btn-banner-primary"><i class="fas fa-camera"></i> Photo</a>
-                <a href="logout.php" class="btn-banner btn-banner-danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </div>
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon"><i class="fa-solid fa-building"></i></div>
+        <div class="brand-text">
+            EMS
+            <small>Employee Portal</small>
         </div>
     </div>
-
-    <!-- Stats -->
-    <div class="stats-grid">
-        <div class="stat-card stat-primary">
-            <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
-            <div class="stat-label">Total Leaves</div>
-            <div class="stat-value"><?php echo $totalLeaves; ?></div>
-        </div>
-        <div class="stat-card stat-success">
-            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-            <div class="stat-label">Approved</div>
-            <div class="stat-value"><?php echo $approvedLeaves; ?></div>
-        </div>
-        <div class="stat-card stat-warning">
-            <div class="stat-icon"><i class="fas fa-clock"></i></div>
-            <div class="stat-label">Pending</div>
-            <div class="stat-value"><?php echo $pendingLeaves; ?></div>
-        </div>
-        <div class="stat-card stat-danger">
-            <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
-            <div class="stat-label">Rejected</div>
-            <div class="stat-value"><?php echo $rejectedLeaves; ?></div>
+    <div class="sidebar-user">
+        <div class="user-avatar"><?php echo strtoupper(substr($employee_name, 0, 1)); ?></div>
+        <div class="user-info">
+            <div class="user-name"><?php echo htmlspecialchars($employee_name); ?></div>
+            <div class="user-role"><?php echo htmlspecialchars($employee_role ?: 'Employee'); ?></div>
         </div>
     </div>
-
-    <!-- Adjustment Stats -->
-    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
-        <div class="stat-card" style="border-top: 3px solid var(--primary);">
-            <div class="stat-icon" style="background: rgba(37,99,235,.12); color: var(--primary);"><i class="fas fa-pen-alt"></i></div>
-            <div class="stat-label">Total Adjustments</div>
-            <div class="stat-value"><?php echo $totalAdj; ?></div>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid var(--success);">
-            <div class="stat-icon" style="background: rgba(16,185,129,.12); color: var(--success);"><i class="fas fa-check-circle"></i></div>
-            <div class="stat-label">Adj. Approved</div>
-            <div class="stat-value"><?php echo $adjApproved; ?></div>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid var(--warning);">
-            <div class="stat-icon" style="background: rgba(245,158,11,.12); color: var(--warning);"><i class="fas fa-clock"></i></div>
-            <div class="stat-label">Adj. Pending</div>
-            <div class="stat-value"><?php echo $adjPending; ?></div>
-        </div>
-        <div class="stat-card" style="border-top: 3px solid var(--danger);">
-            <div class="stat-icon" style="background: rgba(239,68,68,.12); color: var(--danger);"><i class="fas fa-times-circle"></i></div>
-            <div class="stat-label">Adj. Rejected</div>
-            <div class="stat-value"><?php echo $adjRejected; ?></div>
-        </div>
-    </div>
-
-    <!-- Feature Cards -->
-    <div class="feature-row">
-        <!-- Shift Info -->
-        <div class="feature-card">
-            <div class="fc-header fc-header-primary"><i class="fas fa-business-time"></i> Shift Information</div>
-            <div class="fc-body">
-                <div class="fc-label">Your Shift</div>
-                <div class="fc-value"><?php echo htmlspecialchars($shiftLabel); ?></div>
-                <div class="fc-sub"><?php echo $shiftStart; ?> – <?php echo $shiftEnd; ?></div>
-            </div>
+    <nav class="sidebar-nav">
+        <div class="sidebar-section-title">Main</div>
+        <div class="sidebar-section-group">
+        <a href="dashboard.php" class="sidebar-link active"><i class="fa fa-gauge"></i> Dashboard</a>
+        <a href="attendance.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
+        <a href="attendance_history.php" class="sidebar-link"><i class="fa fa-history"></i> Attendance History</a>
+        <a href="apply_leave.php" class="sidebar-link"><i class="fa fa-calendar-plus"></i> Apply Leave</a>
+        <a href="leave_history.php" class="sidebar-link"><i class="fa fa-list"></i> Leave History</a>
+        <a href="leave_balance.php" class="sidebar-link"><i class="fa fa-chart-pie"></i> Leave Balance</a>
+        <a href="submit_adjustment.php" class="sidebar-link"><i class="fa fa-pen-alt"></i> Submit Adjustment</a>
+        <a href="my_adjustments.php" class="sidebar-link"><i class="fa fa-clipboard-list"></i> My Adjustments</a>
         </div>
 
-        <!-- Leave Balance -->
-        <div class="feature-card">
-            <div class="fc-header fc-header-success"><i class="fas fa-chart-pie"></i> Leave Balance</div>
-            <div class="fc-body">
-                <div class="leave-bar-group">
-                    <div class="leave-bar-item">
-                        <div class="lbl-row"><span>Casual</span><span><?php echo (int)$leaveBalance['casual_leave']; ?> days</span></div>
-                        <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['casual_leave']/12)*100); ?>%; background: #10b981;"></div></div>
-                    </div>
-                    <div class="leave-bar-item">
-                        <div class="lbl-row"><span>Sick</span><span><?php echo (int)$leaveBalance['sick_leave']; ?> days</span></div>
-                        <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['sick_leave']/10)*100); ?>%; background: #f59e0b;"></div></div>
-                    </div>
-                    <div class="leave-bar-item">
-                        <div class="lbl-row"><span>Annual</span><span><?php echo (int)$leaveBalance['annual_leave']; ?> days</span></div>
-                        <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['annual_leave']/20)*100); ?>%; background: #3b82f6;"></div></div>
-                    </div>
+        <div class="sidebar-section-title">Profile</div>
+        <div class="sidebar-section-group">
+        <a href="edit_profile.php" class="sidebar-link"><i class="fa fa-user-edit"></i> Edit Profile</a>
+        <a href="upload_photo.php" class="sidebar-link"><i class="fa fa-camera"></i> Upload Photo</a>
+        <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
+        </div>
+
+        <div class="sidebar-section-title">System</div>
+        <div class="sidebar-section-group">
+        <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
+        </div>
+    </nav>
+</aside>
+
+<!-- Main Content -->
+<div class="main-content" id="mainContent">
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                <i class="fa fa-bars"></i>
+            </button>
+            <h4>Employee Dashboard <span>/ Welcome</span></h4>
+        </div>
+        <div class="header-right">
+            <span class="header-date"><i class="fa-regular fa-calendar"></i> <?=date('d M Y')?></span>
+            <span class="header-admin-badge"><i class="fa fa-user"></i> <span><?php echo htmlspecialchars($employee_name); ?></span></span>
+            <?php $darkModeInTopbar = true; include("../dark_mode.php"); ?>
+            <a href="logout.php" class="btn btn-danger btn-sm rounded-pill px-3">
+                <i class="fa fa-sign-out-alt"></i> <span>Logout</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content">
+
+        <!-- Welcome Banner -->
+        <div class="welcome-banner">
+            <div class="welcome-banner-content">
+                <img src="../uploads/<?php echo $photo; ?>" alt="Profile" class="profile-img" onerror="this.src='https://ui-avatars.com/api/?name=<?=urlencode($employee_name)?>&background=2563eb&color=fff&size=72'">
+                <div class="welcome-text">
+                    <h2>Welcome back, <?php echo htmlspecialchars($employee_name); ?>! 👋</h2>
+                    <p>Designation: <strong><?php echo htmlspecialchars($designation); ?></strong></p>
                 </div>
-                <a href="leave_balance.php" class="fc-link"><i class="fas fa-arrow-right"></i> Details</a>
-            </div>
-        </div>
-
-        <!-- Today's Attendance -->
-        <div class="feature-card">
-            <div class="fc-header fc-header-info"><i class="fas fa-user-clock"></i> Today's Attendance</div>
-            <div class="fc-body">
-                <div class="fc-label">Status</div>
-                <div class="fc-value" style="color: <?php echo ($attendanceStatus == 'Present' || $attendanceStatus == 'Present') ? '#10b981' : '#ef4444'; ?>">
-                    <?php echo htmlspecialchars($attendanceStatus); ?>
+                <div class="banner-actions">
+                    <a href="edit_profile.php" class="btn-banner btn-banner-primary"><i class="fas fa-edit"></i> Edit Profile</a>
+                    <a href="upload_photo.php" class="btn-banner btn-banner-primary"><i class="fas fa-camera"></i> Photo</a>
                 </div>
-                <div class="fc-sub"><strong>Check-in:</strong> <?php echo $checkInTime; ?></div>
-                <div class="fc-sub"><strong>Check-out:</strong> <?php echo $checkOutTime; ?></div>
-                <?php if ($workingHours !== '—'): ?>
-                <div class="fc-sub"><strong>Hours:</strong> <?php echo htmlspecialchars($workingHours); ?></div>
-                <?php endif; ?>
-                <a href="attendance.php" class="fc-link"><i class="fas fa-arrow-right"></i> Mark Attendance</a>
             </div>
         </div>
-    </div>
 
-    <!-- Quick Access Menu -->
-    <div class="menu-section">
-        <div class="section-title" style="margin-bottom: 20px;"><i class="fas fa-bars"></i> Quick Access</div>
-        <div class="menu-grid">
-            <a href="attendance.php" class="menu-item mi-attendance">
-                <div class="menu-icon"><i class="fas fa-sign-in-alt"></i></div>
-                <span class="menu-label">Attendance</span>
-            </a>
-            <a href="attendance_history.php" class="menu-item mi-history">
-                <div class="menu-icon"><i class="fas fa-history"></i></div>
-                <span class="menu-label">History</span>
-            </a>
-            <a href="apply_leave.php" class="menu-item mi-apply">
-                <div class="menu-icon"><i class="fas fa-plus-circle"></i></div>
-                <span class="menu-label">Apply Leave</span>
-            </a>
-            <a href="leave_history.php" class="menu-item mi-leave">
-                <div class="menu-icon"><i class="fas fa-list"></i></div>
-                <span class="menu-label">Leave History</span>
-            </a>
-            <a href="submit_adjustment.php" class="menu-item mi-adjustment">
-                <div class="menu-icon"><i class="fas fa-pen-alt"></i></div>
-                <span class="menu-label">Adjustment</span>
-            </a>
-            <a href="my_adjustments.php" class="menu-item mi-myadj">
-                <div class="menu-icon"><i class="fas fa-clipboard-list"></i></div>
-                <span class="menu-label">My Adjustments</span>
-            </a>
-            <a href="change_password.php" class="menu-item mi-password">
-                <div class="menu-icon"><i class="fas fa-key"></i></div>
-                <span class="menu-label">Password</span>
-            </a>
-            <a href="leave_balance.php" class="menu-item mi-balance">
-                <div class="menu-icon"><i class="fas fa-chart-pie"></i></div>
-                <span class="menu-label">Leave Balance</span>
-            </a>
+        <!-- Stats Section -->
+        <div style="background: white; border-radius: var(--radius); border: 1px solid var(--gray-200); box-shadow: var(--shadow); padding: 24px; margin-bottom: 28px;">
+            <div class="section-title" style="margin-bottom: 16px;"><i class="fas fa-chart-simple"></i> Leave Overview</div>
+            <div class="stats-grid" style="margin-bottom: 0;">
+            <div class="stat-card stat-primary">
+                <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-label">Total Leaves</div>
+                <div class="stat-value"><?php echo $totalLeaves > 0 ? $totalLeaves : '0'; ?></div>
+            </div>
+            <div class="stat-card stat-success">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-label">Approved</div>
+                <div class="stat-value"><?php echo $approvedLeaves > 0 ? $approvedLeaves : '0'; ?></div>
+            </div>
+            <div class="stat-card stat-warning">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-label">Pending</div>
+                <div class="stat-value"><?php echo $pendingLeaves > 0 ? $pendingLeaves : '0'; ?></div>
+            </div>
+            <div class="stat-card stat-danger">
+                <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-label">Rejected</div>
+                <div class="stat-value"><?php echo $rejectedLeaves > 0 ? $rejectedLeaves : '0'; ?></div>
+            </div>
         </div>
-    </div>
 
-    <!-- Notices & Holidays -->
-    <div class="row g-4">
-        <div class="col-lg-6">
-            <div class="content-card">
-                <div class="cc-header cc-header-primary"><i class="fas fa-bullhorn"></i> Latest Notices</div>
-                <div class="cc-body">
-                    <?php if ($latestNotices && mysqli_num_rows($latestNotices) > 0): ?>
-                        <?php while ($notice = mysqli_fetch_assoc($latestNotices)): ?>
-                        <div class="list-item">
-                            <h6><?php echo htmlspecialchars($notice['title']); ?></h6>
-                            <p><?php echo htmlspecialchars($notice['notice']); ?></p>
-                            <?php if (!empty($notice['created_at'])): ?>
-                            <small><i class="fa-regular fa-clock"></i> <?php echo date('d-m-Y', strtotime($notice['created_at'])); ?></small>
-                            <?php endif; ?>
+        <!-- Adjustment Stats -->
+        <!-- Adjustment Stats -->
+        <div style="background: white; border-radius: var(--radius); border: 1px solid var(--gray-200); box-shadow: var(--shadow); padding: 24px; margin-bottom: 28px;">
+            <div class="section-title" style="margin-bottom: 16px;"><i class="fas fa-pen-to-square"></i> Adjustment Overview</div>
+            <div class="stats-grid" style="margin-bottom: 0;">
+            <div class="stat-card stat-secondary">
+                <div class="stat-icon"><i class="fas fa-pen-alt"></i></div>
+                <div class="stat-label">Total Adjustments</div>
+                <div class="stat-value"><?php echo $totalAdj; ?></div>
+            </div>
+            <div class="stat-card stat-success">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-label">Approved</div>
+                <div class="stat-value"><?php echo $adjApproved; ?></div>
+            </div>
+            <div class="stat-card stat-warning">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-label">Pending</div>
+                <div class="stat-value"><?php echo $adjPending; ?></div>
+            </div>
+            <div class="stat-card stat-danger">
+                <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-label">Rejected</div>
+                <div class="stat-value"><?php echo $adjRejected; ?></div>
+            </div>
+        </div>
+
+        <!-- Feature Cards -->
+        <div class="section-title" style="margin-bottom: 16px;"><i class="fas fa-info-circle"></i> Quick Info</div>
+        <div class="feature-row">
+            <!-- Shift Info -->
+            <div class="feature-card">
+                <div class="fc-header fc-header-primary"><i class="fas fa-business-time"></i> Shift Information</div>
+                <div class="fc-body">
+                    <div class="fc-label">Your Shift</div>
+                    <div class="fc-value"><?php echo htmlspecialchars($shiftLabel); ?></div>
+                    <div class="fc-sub"><?php echo $shiftStart; ?> – <?php echo $shiftEnd; ?></div>
+                </div>
+            </div>
+
+            <!-- Leave Balance -->
+            <div class="feature-card">
+                <div class="fc-header fc-header-success"><i class="fas fa-chart-pie"></i> Leave Balance</div>
+                <div class="fc-body">
+                    <div class="leave-bar-group">
+                        <div class="leave-bar-item">
+                            <div class="lbl-row"><span>Casual</span><span><?php echo (int)$leaveBalance['casual_leave']; ?> days</span></div>
+                            <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['casual_leave']/12)*100); ?>%; background: #10b981;"></div></div>
                         </div>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fa-regular fa-bell"></i>
-                        <p>No notices available</p>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="content-card">
-                <div class="cc-header cc-header-success"><i class="fas fa-umbrella-beach"></i> Upcoming Holidays</div>
-                <div class="cc-body">
-                    <?php if ($upcomingHolidays && mysqli_num_rows($upcomingHolidays) > 0): ?>
-                        <?php while ($holiday = mysqli_fetch_assoc($upcomingHolidays)): ?>
-                        <div class="list-item">
-                            <h6><?php echo htmlspecialchars($holiday['holiday_name']); ?></h6>
-                            <p><?php echo htmlspecialchars($holiday['description'] ?? ''); ?></p>
-                            <small><i class="fa-regular fa-calendar"></i> <?php echo date('d-m-Y', strtotime($holiday['holiday_date'])); ?></small>
+                        <div class="leave-bar-item">
+                            <div class="lbl-row"><span>Sick</span><span><?php echo (int)$leaveBalance['sick_leave']; ?> days</span></div>
+                            <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['sick_leave']/10)*100); ?>%; background: #f59e0b;"></div></div>
                         </div>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fa-regular fa-calendar"></i>
-                        <p>No upcoming holidays</p>
+                        <div class="leave-bar-item">
+                            <div class="lbl-row"><span>Annual</span><span><?php echo (int)$leaveBalance['annual_leave']; ?> days</span></div>
+                            <div class="bar-track"><div class="bar-fill" style="width: <?php echo min(100, ((int)$leaveBalance['annual_leave']/20)*100); ?>%; background: #3b82f6;"></div></div>
+                        </div>
                     </div>
+                    <a href="leave_balance.php" class="fc-link"><i class="fas fa-arrow-right"></i> Details</a>
+                </div>
+            </div>
+
+            <!-- Today's Attendance -->
+            <div class="feature-card">
+                <div class="fc-header fc-header-info"><i class="fas fa-user-clock"></i> Today's Attendance</div>
+                <div class="fc-body">
+                    <div class="fc-label">Status</div>
+                    <div class="fc-value" style="color: <?php echo ($attendanceStatus == 'Present') ? '#10b981' : '#ef4444'; ?>">
+                        <?php echo htmlspecialchars($attendanceStatus); ?>
+                    </div>
+                    <div class="fc-sub"><strong>Check-in:</strong> <?php echo $checkInTime; ?></div>
+                    <div class="fc-sub"><strong>Check-out:</strong> <?php echo $checkOutTime; ?></div>
+                    <?php if ($workingHours !== '—'): ?>
+                    <div class="fc-sub"><strong>Hours:</strong> <?php echo htmlspecialchars($workingHours); ?></div>
                     <?php endif; ?>
+                    <a href="attendance.php" class="fc-link"><i class="fas fa-arrow-right"></i> Mark Attendance</a>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Recent Leave Requests -->
-    <?php
-    $recent = mysqli_query($conn, "SELECT leave_type, start_date, end_date, status FROM leave_requests WHERE employee_id='$employee_id' ORDER BY id DESC LIMIT 5");
-    $recentAdjustments = mysqli_query($conn, "SELECT request_no, attendance_date, adjustment_type, status, created_at FROM attendance_adjustments WHERE employee_id='$employee_id' ORDER BY id DESC LIMIT 5");
-    ?>
-    <div class="content-card mt-4">
-        <div class="cc-header cc-header-primary"><i class="fas fa-file-alt"></i> Recent Leave Requests</div>
-        <div class="cc-body p-0">
-            <div class="table-responsive">
-                <table class="table table-modern">
-                    <thead>
-                        <tr><th>Leave Type</th><th>Start Date</th><th>End Date</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php if(mysqli_num_rows($recent) > 0): ?>
-                            <?php while($leave = mysqli_fetch_assoc($recent)):
-                                $sClass = 'badge-pending';
-                                if($leave['status'] === 'Approved') $sClass = 'badge-approved';
-                                elseif($leave['status'] === 'Rejected') $sClass = 'badge-rejected';
-                            ?>
-                            <tr>
-                                <td><?php echo $leave['leave_type']; ?></td>
-                                <td><?php echo date("d-m-Y", strtotime($leave['start_date'])); ?></td>
-                                <td><?php echo date("d-m-Y", strtotime($leave['end_date'])); ?></td>
-                                <td><span class="badge-modern <?php echo $sClass; ?>"><?php echo $leave['status']; ?></span></td>
-                            </tr>
+        <!-- Quick Access Menu -->
+        <div class="card-modern mb-4">
+            <div class="card-header-custom">
+                <h6><i class="fas fa-bars"></i> Quick Access</h6>
+            </div>
+            <div class="card-body-custom">
+                <div class="menu-grid">
+                    <a href="attendance.php" class="menu-item mi-attendance">
+                        <div class="menu-icon"><i class="fas fa-sign-in-alt"></i></div>
+                        <span class="menu-label">Attendance</span>
+                    </a>
+                    <a href="attendance_history.php" class="menu-item mi-history">
+                        <div class="menu-icon"><i class="fas fa-history"></i></div>
+                        <span class="menu-label">History</span>
+                    </a>
+                    <a href="apply_leave.php" class="menu-item mi-apply">
+                        <div class="menu-icon"><i class="fas fa-plus-circle"></i></div>
+                        <span class="menu-label">Apply Leave</span>
+                    </a>
+                    <a href="leave_history.php" class="menu-item mi-leave">
+                        <div class="menu-icon"><i class="fas fa-list"></i></div>
+                        <span class="menu-label">Leave History</span>
+                    </a>
+                    <a href="submit_adjustment.php" class="menu-item mi-adjustment">
+                        <div class="menu-icon"><i class="fas fa-pen-alt"></i></div>
+                        <span class="menu-label">Adjustment</span>
+                    </a>
+                    <a href="my_adjustments.php" class="menu-item mi-myadj">
+                        <div class="menu-icon"><i class="fas fa-clipboard-list"></i></div>
+                        <span class="menu-label">My Adjustments</span>
+                    </a>
+                    <a href="change_password.php" class="menu-item mi-password">
+                        <div class="menu-icon"><i class="fas fa-key"></i></div>
+                        <span class="menu-label">Password</span>
+                    </a>
+                    <a href="leave_balance.php" class="menu-item mi-balance">
+                        <div class="menu-icon"><i class="fas fa-chart-pie"></i></div>
+                        <span class="menu-label">Leave Balance</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notices & Holidays -->
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card-modern">
+                    <div class="card-header-custom">
+                        <h6><i class="fas fa-bullhorn"></i> Latest Notices</h6>
+                    </div>
+                    <div class="card-body-custom">
+                        <?php if ($latestNotices && mysqli_num_rows($latestNotices) > 0): ?>
+                            <?php while ($notice = mysqli_fetch_assoc($latestNotices)): ?>
+                            <div class="list-item">
+                                <h6><?php echo htmlspecialchars($notice['title']); ?></h6>
+                                <p><?php echo htmlspecialchars($notice['notice']); ?></p>
+                                <?php if (!empty($notice['created_at'])): ?>
+                                <small><i class="fa-regular fa-clock"></i> <?php echo date('d-m-Y', strtotime($notice['created_at'])); ?></small>
+                                <?php endif; ?>
+                            </div>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="4" class="text-center py-4 text-muted">No leave requests yet</td></tr>
+                        <div class="empty-state">
+                            <i class="fa-regular fa-bell"></i>
+                            <p>No notices available</p>
+                        </div>
                         <?php endif; ?>
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Recent Adjustment Requests -->
-    <div class="content-card mt-4">
-        <div class="cc-header cc-header-primary"><i class="fas fa-pen-alt"></i> Recent Adjustment Requests</div>
-        <div class="cc-body p-0">
-            <div class="table-responsive">
-                <table class="table table-modern">
-                    <thead>
-                        <tr><th>Request #</th><th>Attendance Date</th><th>Type</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php if($recentAdjustments && mysqli_num_rows($recentAdjustments) > 0): ?>
-                            <?php while($adj = mysqli_fetch_assoc($recentAdjustments)):
-                                $sClass = 'badge-pending';
-                                if($adj['status'] === 'Approved') $sClass = 'badge-approved';
-                                elseif($adj['status'] === 'Rejected' || $adj['status'] === 'Cancelled') $sClass = 'badge-rejected';
-                            ?>
-                            <tr>
-                                <td><span class="fw-bold"><?php echo htmlspecialchars($adj['request_no']); ?></span></td>
-                                <td><?php echo date("d-m-Y", strtotime($adj['attendance_date'])); ?></td>
-                                <td><?php echo htmlspecialchars($adj['adjustment_type']); ?></td>
-                                <td><span class="badge-modern <?php echo $sClass; ?>"><?php echo $adj['status']; ?></span></td>
-                            </tr>
+            <div class="col-lg-6">
+                <div class="card-modern">
+                    <div class="card-header-custom">
+                        <h6><i class="fas fa-umbrella-beach"></i> Upcoming Holidays</h6>
+                    </div>
+                    <div class="card-body-custom">
+                        <?php if ($upcomingHolidays && mysqli_num_rows($upcomingHolidays) > 0): ?>
+                            <?php while ($holiday = mysqli_fetch_assoc($upcomingHolidays)): ?>
+                            <div class="list-item">
+                                <h6><?php echo htmlspecialchars($holiday['holiday_name']); ?></h6>
+                                <p><?php echo htmlspecialchars($holiday['description'] ?? ''); ?></p>
+                                <small><i class="fa-regular fa-calendar"></i> <?php echo date('d-m-Y', strtotime($holiday['holiday_date'])); ?></small>
+                            </div>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="4" class="text-center py-4 text-muted">No adjustment requests yet</td></tr>
+                        <div class="empty-state">
+                            <i class="fa-regular fa-calendar"></i>
+                            <p>No upcoming holidays</p>
+                        </div>
                         <?php endif; ?>
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="p-3 border-top" style="border-color: var(--gray-200);">
-            <a href="my_adjustments.php" class="btn btn-sm btn-outline-primary rounded-pill me-2"><i class="fas fa-clipboard-list"></i> View All</a>
-            <a href="submit_adjustment.php" class="btn btn-sm btn-outline-success rounded-pill"><i class="fas fa-plus"></i> New Adjustment</a>
-        </div>
-    </div>
 
-    <!-- Footer -->
-    <div class="footer">
-        Employee Management System &copy; 2026 &mdash; Developed by Minam Shaikh
-    </div>
+        <!-- Footer -->
+        <footer class="text-center mt-5 mb-2 text-muted" style="font-size: 13px;">
+            Employee Management System &copy; 2026 &mdash; Employee Portal
+        </footer>
 
+    </div>
 </div>
 
+<script>
+// Sidebar Toggle
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+sidebarToggle.addEventListener('click', function() {
+    const isMobile = window.matchMedia('(max-width: 991px)').matches;
+    if (isMobile) {
+        const isOpen = sidebar.classList.toggle('open');
+        sidebarBackdrop.classList.toggle('show', isOpen);
+    } else {
+        document.body.classList.toggle('sidebar-collapsed');
+    }
+});
+
+sidebarBackdrop.addEventListener('click', function() {
+    sidebar.classList.remove('open');
+    sidebarBackdrop.classList.remove('show');
+});
+
+// Sidebar Category Collapse/Expand
+document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(function(title) {
+    const sectionName = title.childNodes[0].textContent.trim();
+    const icon = document.createElement('span');
+    icon.className = 'section-collapse-icon';
+    icon.textContent = '\u25BC';
+    title.appendChild(icon);
+
+    title.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A') return;
+        const group = this.nextElementSibling;
+        if (!group || !group.classList.contains('sidebar-section-group')) return;
+        const isCollapsed = group.classList.toggle('collapsed');
+        const ico = this.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.toggle('collapsed', isCollapsed);
+        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
+    });
+
+    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const group = title.nextElementSibling;
+    if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
+        group.classList.add('collapsed');
+        const ico = title.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.add('collapsed');
+    }
+});
+</script>
 </body>
 </html>

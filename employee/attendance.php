@@ -1,6 +1,9 @@
 <?php
 session_start();
 
+// Set timezone to Pakistan Standard Time
+date_default_timezone_set('Asia/Karachi');
+
 if (!isset($_SESSION['employee_id'])) {
     header("Location: ../index.php");
     exit();
@@ -108,30 +111,6 @@ if(isset($_POST['check_out']))
         UPDATE attendance
         SET check_out='$currentTime', working_hours='$workingHours', status='$status'
         WHERE employee_id='$employee_id' AND attendance_date='$today'
-        ");
-    }
-
-    header("Location: attendance.php");
-    exit();
-}
-
-// =======================
-// MARK AS ABSENT
-// =======================
-if(isset($_POST['mark_absent']))
-{
-    $already = mysqli_query($conn,"
-    SELECT * FROM attendance
-    WHERE employee_id='$employee_id'
-    AND attendance_date='$today'
-    ");
-
-    if(mysqli_num_rows($already)==0)
-    {
-        mysqli_query($conn,"
-        INSERT INTO attendance
-        (employee_id, attendance_date, status)
-        VALUES ('$employee_id', '$today', 'Absent')
         ");
     }
 
@@ -682,11 +661,6 @@ body.dark-mode {
                     <form method="POST" style="display: inline;">
                         <button type="submit" name="check_in" class="btn-large btn-check-in">
                             <i class="fa-solid fa-right-to-bracket"></i> Check In
-                        </button>
-                    </form>
-                    <form method="POST" style="display: inline;">
-                        <button type="submit" name="mark_absent" class="btn-large btn-absent">
-                            <i class="fa-solid fa-xmark"></i> Mark as Absent
                         </button>
                     </form>
                 </div>

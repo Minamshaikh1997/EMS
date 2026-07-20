@@ -1,5 +1,8 @@
 <?php
 
+// Set timezone to Pakistan Standard Time
+date_default_timezone_set('Asia/Karachi');
+
 if (
     $_SERVER['HTTP_HOST'] == 'localhost' ||
     $_SERVER['HTTP_HOST'] == '127.0.0.1'
@@ -12,7 +15,7 @@ if (
 } else {
     // InfinityFree
     $host = "sql202.infinityfree.com";
-    $user = "if0_42402211";
+    $user = "YOUR_MYSQL_USERNAME";   // Panel se copy karein
     $password = "Roman1250";
     $database = "if0_42402211_EMS";
 }
