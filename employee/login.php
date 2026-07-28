@@ -9,10 +9,11 @@ session_start();
 <title>Employee Login</title>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+<?php include("../dark_mode.php"); ?>
+</style>
 
 </head>
-
-<?php include("../dark_mode.php"); ?>
 
 <body class="bg-light">
 <div class="container mt-5">

@@ -11,6 +11,7 @@ session_start();
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+<?php include("../dark_mode.php"); ?>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {

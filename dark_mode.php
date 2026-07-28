@@ -52,37 +52,3 @@
 .dark-mode .stat-card .stat-label { color: #64748b; }
 .dark-mode .section-header h5 { color: #e2e8f0; }
 </style>
-
-<button class="btn dark-mode-control" id="darkModeToggle"
-style="<?php echo !empty($darkModeInTopbar) ? 'position:static;' : 'position:fixed;top:15px;right:20px;z-index:9999;'; ?>background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#fff;border-radius:10px;padding:8px 14px;font-size:13px;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s ease;"
-onclick="toggleDarkMode()">
-    <span id="darkModeIcon">&#127769;</span>
-    <span id="darkModeText">Dark Mode</span>
-</button>
-
-<script>
-function toggleDarkMode() {
-    document.body.classList.toggle("dark-mode");
-    const isDark = document.body.classList.contains("dark-mode");
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-    updateDarkModeButton();
-}
-
-function updateDarkModeButton() {
-    const isDark = document.body.classList.contains("dark-mode");
-    const icon = document.getElementById("darkModeIcon");
-    const text = document.getElementById("darkModeText");
-    if (icon && text) {
-        icon.textContent = isDark ? "\u2600\ufe0f" : "\ud83c\udf19";
-        text.textContent = isDark ? "Light Mode" : "Dark Mode";
-    }
-}
-
-(function() {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-        document.body.classList.add("dark-mode");
-    }
-    updateDarkModeButton();
-})();
-</script>

@@ -149,6 +149,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
     </div>
     <nav class="sidebar-nav">
         <div class="sidebar-section-title">Main</div>
+        <div class="sidebar-section-group">
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
@@ -158,7 +159,10 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="manage_shifts.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Manage Shifts</a>
         <a href="attendance_report.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
         <a href="reports.php" class="sidebar-link"><i class="fa fa-chart-column"></i> Reports</a>
+        </div>
+
         <div class="sidebar-section-title">Payroll</div>
+        <div class="sidebar-section-group">
         <a href="payroll_dashboard.php" class="sidebar-link"><i class="fa-solid fa-money-bill-wave"></i> Payroll Dashboard</a>
         <a href="generate_payroll.php" class="sidebar-link"><i class="fa fa-file-invoice-dollar"></i> Generate Payroll</a>
         <a href="payroll_history.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Payroll History</a>
@@ -167,11 +171,16 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="payroll_reports.php" class="sidebar-link"><i class="fa-solid fa-chart-line"></i> Payroll Reports</a>
         <a href="salary_structure.php" class="sidebar-link"><i class="fa fa-money-bill-wave"></i> Salary Structure</a>
         <a href="monthly_payroll.php" class="sidebar-link"><i class="fa fa-calendar"></i> Monthly Payroll</a>
+        </div>
+
         <div class="sidebar-section-title">System</div>
+        <div class="sidebar-section-group">
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
+        </div>
     </nav>
 </aside>
 
@@ -266,9 +275,11 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
 </div>
 
 <script>
+// Sidebar Toggle
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
 sidebarToggle.addEventListener('click', function() {
     const isMobile = window.matchMedia('(max-width: 991px)').matches;
     if (isMobile) {
@@ -278,9 +289,42 @@ sidebarToggle.addEventListener('click', function() {
         document.body.classList.toggle('sidebar-collapsed');
     }
 });
+
 sidebarBackdrop.addEventListener('click', function() {
     sidebar.classList.remove('open');
     sidebarBackdrop.classList.remove('show');
+});
+
+// Sidebar Category Collapse/Expand
+document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(function(title) {
+    // Add collapse icon with data-section attribute
+    const sectionName = title.childNodes[0].textContent.trim();
+    const icon = document.createElement('span');
+    icon.className = 'section-collapse-icon';
+    icon.textContent = '\u25BC';
+    icon.setAttribute('data-section', sectionName);
+    title.appendChild(icon);
+
+    // Toggle on click
+    title.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A') return;
+        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        if (!group || !group.classList.contains('sidebar-section-group')) return;
+
+        const isCollapsed = group.classList.toggle('collapsed');
+        const ico = this.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.toggle('collapsed', isCollapsed);
+        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
+    });
+
+    // Restore state
+    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const group = title.nextElementSibling;
+    if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
+        group.classList.add('collapsed');
+        const ico = title.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.add('collapsed');
+    }
 });
 </script>
 </body>

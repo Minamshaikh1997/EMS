@@ -48,6 +48,18 @@ if(isset($_POST['update']))
     $reporting_manager_id = isset($_POST['reporting_manager_id']) ? intval($_POST['reporting_manager_id']) : 0;
     $reporting_supervisor_id = isset($_POST['reporting_supervisor_id']) ? intval($_POST['reporting_supervisor_id']) : 0;
     $reporting_team_lead_id = isset($_POST['reporting_team_lead_id']) ? intval($_POST['reporting_team_lead_id']) : 0;
+    $can_view_payroll = isset($_POST['can_view_payroll']) ? 1 : 0;
+    
+    // Get employee rights
+    $rights = [
+        'can_view_payroll' => isset($_POST['rights']['can_view_payroll']) ? 1 : 0,
+        'can_apply_leave' => isset($_POST['rights']['can_apply_leave']) ? 1 : 0,
+        'can_view_attendance' => isset($_POST['rights']['can_view_attendance']) ? 1 : 0,
+        'can_submit_adjustment' => isset($_POST['rights']['can_submit_adjustment']) ? 1 : 0,
+        'can_edit_profile' => isset($_POST['rights']['can_edit_profile']) ? 1 : 0,
+        'can_view_reports' => isset($_POST['rights']['can_view_reports']) ? 1 : 0,
+        'can_change_password' => isset($_POST['rights']['can_change_password']) ? 1 : 0
+    ];
 
     mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_name VARCHAR(100) DEFAULT 'Morning'");
     mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_start_time TIME DEFAULT '09:00:00'");
@@ -56,6 +68,13 @@ if(isset($_POST['update']))
     mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_manager_id INT DEFAULT NULL");
     mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_supervisor_id INT DEFAULT NULL");
     mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_team_lead_id INT DEFAULT NULL");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_payroll TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_apply_leave TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_attendance TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_submit_adjustment TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_profile TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_reports TINYINT(1) DEFAULT 1");
+    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_change_password TINYINT(1) DEFAULT 1");
 
     $is_active = ($status == 'Active') ? 1 : 0;
 
@@ -77,7 +96,14 @@ if(isset($_POST['update']))
         is_active='$is_active',
         reporting_manager_id='$reporting_manager_id',
         reporting_supervisor_id='$reporting_supervisor_id',
-        reporting_team_lead_id='$reporting_team_lead_id'
+        reporting_team_lead_id='$reporting_team_lead_id',
+        can_view_payroll='$can_view_payroll',
+        can_apply_leave='{$rights['can_apply_leave']}',
+        can_view_attendance='{$rights['can_view_attendance']}',
+        can_submit_adjustment='{$rights['can_submit_adjustment']}',
+        can_edit_profile='{$rights['can_edit_profile']}',
+        can_view_reports='{$rights['can_view_reports']}',
+        can_change_password='{$rights['can_change_password']}'
         WHERE id='$id'
     ");
 
@@ -217,6 +243,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
     </div>
     <nav class="sidebar-nav">
         <div class="sidebar-section-title">Main</div>
+        <div class="sidebar-section-group">
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
@@ -226,8 +253,10 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="manage_shifts.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Manage Shifts</a>
         <a href="attendance_report.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
         <a href="reports.php" class="sidebar-link"><i class="fa fa-chart-column"></i> Reports</a>
+        </div>
 
         <div class="sidebar-section-title">Payroll</div>
+        <div class="sidebar-section-group">
         <a href="payroll_dashboard.php" class="sidebar-link"><i class="fa-solid fa-money-bill-wave"></i> Payroll Dashboard</a>
         <a href="generate_payroll.php" class="sidebar-link"><i class="fa fa-file-invoice-dollar"></i> Generate Payroll</a>
         <a href="payroll_history.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Payroll History</a>
@@ -236,12 +265,16 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="payroll_reports.php" class="sidebar-link"><i class="fa-solid fa-chart-line"></i> Payroll Reports</a>
         <a href="salary_structure.php" class="sidebar-link"><i class="fa fa-money-bill-wave"></i> Salary Structure</a>
         <a href="monthly_payroll.php" class="sidebar-link"><i class="fa fa-calendar"></i> Monthly Payroll</a>
+        </div>
 
         <div class="sidebar-section-title">System</div>
+        <div class="sidebar-section-group">
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
+        </div>
     </nav>
 </aside>
 
@@ -415,6 +448,78 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
                         </div>
                     </div>
 
+                    <div class="form-section-title mt-4"><i class="fa fa-user-shield"></i> Employee Rights & Permissions</div>
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle me-2"></i>
+                        <strong>Control Feature Access:</strong> Enable or disable specific features for this employee. 
+                        Disabled features will be hidden from the employee's dashboard and access will be restricted.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_view_payroll]" id="right_can_view_payroll" value="1" <?php echo ($row['can_view_payroll'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_view_payroll">
+                                    <strong>View Payroll/Salary</strong>
+                                    <small class="d-block text-muted">Can view salary slips and payroll information</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_apply_leave]" id="right_can_apply_leave" value="1" <?php echo ($row['can_apply_leave'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_apply_leave">
+                                    <strong>Apply for Leave</strong>
+                                    <small class="d-block text-muted">Can submit new leave applications</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_view_attendance]" id="right_can_view_attendance" value="1" <?php echo ($row['can_view_attendance'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_view_attendance">
+                                    <strong>View Attendance</strong>
+                                    <small class="d-block text-muted">Can view attendance history and mark attendance</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_submit_adjustment]" id="right_can_submit_adjustment" value="1" <?php echo ($row['can_submit_adjustment'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_submit_adjustment">
+                                    <strong>Submit Adjustments</strong>
+                                    <small class="d-block text-muted">Can request attendance adjustments</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_edit_profile]" id="right_can_edit_profile" value="1" <?php echo ($row['can_edit_profile'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_edit_profile">
+                                    <strong>Edit Profile</strong>
+                                    <small class="d-block text-muted">Can update their profile information</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_view_reports]" id="right_can_view_reports" value="1" <?php echo ($row['can_view_reports'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_view_reports">
+                                    <strong>View Reports</strong>
+                                    <small class="d-block text-muted">Can access reports and analytics</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="rights[can_change_password]" id="right_can_change_password" value="1" <?php echo ($row['can_change_password'] ?? 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="right_can_change_password">
+                                    <strong>Change Password</strong>
+                                    <small class="d-block text-muted">Can change their account password</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mt-4 d-flex gap-2">
                         <button type="submit" name="update" class="btn btn-primary rounded-pill px-4">
                             <i class="fa fa-save"></i> Update Employee
@@ -451,6 +556,38 @@ sidebarToggle.addEventListener('click', function() {
 sidebarBackdrop.addEventListener('click', function() {
     sidebar.classList.remove('open');
     sidebarBackdrop.classList.remove('show');
+});
+
+// Sidebar Category Collapse/Expand
+document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(function(title) {
+    // Add collapse icon with data-section attribute
+    const sectionName = title.childNodes[0].textContent.trim();
+    const icon = document.createElement('span');
+    icon.className = 'section-collapse-icon';
+    icon.textContent = '\u25BC';
+    icon.setAttribute('data-section', sectionName);
+    title.appendChild(icon);
+
+    // Toggle on click
+    title.addEventListener('click', function(e) {
+        if (e.target.tagName === 'A') return;
+        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        if (!group || !group.classList.contains('sidebar-section-group')) return;
+
+        const isCollapsed = group.classList.toggle('collapsed');
+        const ico = this.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.toggle('collapsed', isCollapsed);
+        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
+    });
+
+    // Restore state
+    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const group = title.nextElementSibling;
+    if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
+        group.classList.add('collapsed');
+        const ico = title.querySelector('.section-collapse-icon');
+        if (ico) ico.classList.add('collapsed');
+    }
 });
 </script>
 </body>

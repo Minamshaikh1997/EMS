@@ -173,6 +173,7 @@ $teamLeads = $allEmployees;
         <div class="sidebar-section-group">
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>

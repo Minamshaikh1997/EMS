@@ -2,13 +2,38 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Enable MySQL error reporting
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 include("admincheck_role.php");
 include("../config/db.php");
+
+// Check and restore MySQL connection if needed
+function ensure_db_connection($conn) {
+    if (!$conn || !mysqli_ping($conn)) {
+        // Connection lost, need to reconnect
+        global $host, $user, $password, $database;
+        $conn = mysqli_connect($host, $user, $password, $database);
+        if (!$conn) {
+            die("Database Connection Failed: " . mysqli_connect_error());
+        }
+    }
+    return $conn;
+}
+
+// Ensure connection is alive
+$conn = ensure_db_connection($conn);
 
 // Dashboard Statistics
 $totalEmployees = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM employees"))['total'];
 $activeEmployees = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM employees WHERE status='Active' AND is_active=1"))['total'];
 $inactiveEmployees = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM employees WHERE status!='Active' OR is_active=0"))['total'];
+
+// Recheck connection before more queries
+$conn = ensure_db_connection($conn);
+
+// Ensure employee_id column exists
+mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50) DEFAULT NULL AFTER id");
 
 // Employee status list for table
 $employeeStatusList = mysqli_query($conn, "
@@ -19,6 +44,10 @@ $employeeStatusList = mysqli_query($conn, "
 
 // Managers who can change employee status (Super Admin, Admin, Operations Manager)
 $canManageStatus = in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager']);
+
+// Recheck connection before more queries
+$conn = ensure_db_connection($conn);
+
 $totalLeaves = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM leave_requests"))['total'];
 $approvedLeaves = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM leave_requests WHERE status='Approved'"))['total'];
 $pendingLeaves = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM leave_requests WHERE status='Pending'"))['total'];
@@ -30,6 +59,9 @@ $totalAdjustments = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS t
 $pendingAdjustments = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM attendance_adjustments WHERE status='Pending'"))['total'];
 $approvedAdjustments = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM attendance_adjustments WHERE status='Approved'"))['total'];
 $rejectedAdjustments = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM attendance_adjustments WHERE status='Rejected'"))['total'];
+
+// Recheck connection before more queries
+$conn = ensure_db_connection($conn);
 
 /* Latest Employees */
 $latestEmployees = mysqli_query($conn, "
@@ -56,6 +88,9 @@ ORDER BY id DESC
 LIMIT 5
 ");
 
+// Recheck connection before more queries
+$conn = ensure_db_connection($conn);
+
 /* Upcoming Holidays */
 $upcomingHolidays = mysqli_query($conn, "
 SELECT *
@@ -67,16 +102,15 @@ LIMIT 5
 
 /* Latest Adjustment Requests */
 $latestAdjustments = mysqli_query($conn, "
-SELECT a.*, e.full_name, e.department,
-       s.name AS supervisor_name,
-       ad.name AS admin_name
+SELECT a.*, e.full_name, e.department
 FROM attendance_adjustments a
 INNER JOIN employees e ON a.employee_id = e.id
-LEFT JOIN admin s ON a.supervisor_id = s.id
-LEFT JOIN admin ad ON a.admin_id = ad.id
 ORDER BY a.id DESC
 LIMIT 5
 ");
+
+// Recheck connection before final queries
+$conn = ensure_db_connection($conn);
 
 // Department chart data
 $deptChart = mysqli_query($conn, "SELECT department, COUNT(*) total FROM employees GROUP BY department");
@@ -306,6 +340,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
         <div class="sidebar-section-group">
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -416,8 +451,8 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                 $isActuallyActive = ($emp['status'] == 'Active' && $emp['is_active'] == 1);
                             ?>
                             <tr>
-                                <td><span class="fw-bold"><?=htmlspecialchars($emp['employee_id'])?></span></td>
-                                <td><?=htmlspecialchars($emp['full_name'])?></td>
+                                <td><span class="fw-bold"><?=htmlspecialchars($emp['employee_id'] ?? 'N/A')?></span></td>
+                                <td><?=htmlspecialchars($emp['full_name'] ?? 'N/A')?></td>
                                 <td><?=htmlspecialchars($emp['department'] ?? 'N/A')?></td>
                                 <td><?=htmlspecialchars($emp['designation'] ?? 'N/A')?></td>
                                 <td>
@@ -438,11 +473,11 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                     <div class="btn-group btn-group-sm">
                                         <?php if($canManageStatus): ?>
                                             <?php if($isActuallyActive): ?>
-                                                <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=deactivate" class="btn btn-outline-warning" onclick="return confirm('Deactivate <?=htmlspecialchars($emp['full_name'])?>?')" title="Deactivate">
+                                            <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=deactivate" class="btn btn-outline-warning" onclick="return confirm('Deactivate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')" title="Deactivate">
                                                     <i class="fa fa-pause-circle"></i> Deactivate
                                                 </a>
                                             <?php else: ?>
-                                                <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=activate" class="btn btn-outline-success" onclick="return confirm('Activate <?=htmlspecialchars($emp['full_name'])?>?')" title="Activate">
+                                            <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=activate" class="btn btn-outline-success" onclick="return confirm('Activate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')" title="Activate">
                                                     <i class="fa fa-play-circle"></i> Activate
                                                 </a>
                                             <?php endif; ?>
@@ -533,9 +568,9 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                 <tbody>
                                 <?php while($emp = mysqli_fetch_assoc($latestEmployees)){ ?>
                                     <tr>
-                                        <td><span class="fw-bold"><?=htmlspecialchars($emp['employee_id'])?></span></td>
-                                        <td><?=htmlspecialchars($emp['full_name'])?></td>
-                                        <td><?=htmlspecialchars($emp['department'])?></td>
+                                        <td><span class="fw-bold"><?=htmlspecialchars($emp['employee_id'] ?? 'N/A')?></span></td>
+                                        <td><?=htmlspecialchars($emp['full_name'] ?? 'N/A')?></td>
+                                        <td><?=htmlspecialchars($emp['department'] ?? 'N/A')?></td>
                                         <td><?=date('d-m-Y', strtotime($emp['joining_date']))?></td>
                                     </tr>
                                 <?php } ?>
@@ -560,8 +595,8 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                 <tbody>
                                 <?php while($leave = mysqli_fetch_assoc($latestLeaves)){ ?>
                                     <tr>
-                                        <td><?=htmlspecialchars($leave['full_name'])?></td>
-                                        <td><?=htmlspecialchars($leave['leave_type'])?></td>
+                                        <td><?=htmlspecialchars($leave['full_name'] ?? 'N/A')?></td>
+                                        <td><?=htmlspecialchars($leave['leave_type'] ?? 'N/A')?></td>
                                         <td>
                                             <?php
                                             $badgeClass = 'badge-pending';
@@ -592,8 +627,8 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                         <?php if($latestNotices && mysqli_num_rows($latestNotices) > 0): ?>
                             <?php while($notice = mysqli_fetch_assoc($latestNotices)){ ?>
                             <div class="list-item">
-                                <h6><?=htmlspecialchars($notice['title'])?></h6>
-                                <p><?=htmlspecialchars($notice['notice'])?></p>
+                                <h6><?=htmlspecialchars($notice['title'] ?? 'N/A')?></h6>
+                                <p><?=htmlspecialchars($notice['notice'] ?? '')?></p>
                                 <small><i class="fa-regular fa-clock"></i> <?=date('d-m-Y', strtotime($notice['created_at']))?></small>
                             </div>
                             <?php } ?>
@@ -616,7 +651,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                         <?php if($upcomingHolidays && mysqli_num_rows($upcomingHolidays) > 0): ?>
                             <?php while($holiday = mysqli_fetch_assoc($upcomingHolidays)){ ?>
                             <div class="list-item">
-                                <h6><?=htmlspecialchars($holiday['holiday_name'])?></h6>
+                                <h6><?=htmlspecialchars($holiday['holiday_name'] ?? 'N/A')?></h6>
                                 <p><?=htmlspecialchars($holiday['description'] ?? '')?></p>
                                 <small><i class="fa-regular fa-calendar"></i> <?=date('d-m-Y', strtotime($holiday['holiday_date']))?></small>
                             </div>
@@ -675,11 +710,11 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                 elseif($adj['status'] == 'Cancelled') $adjBadge = 'badge-cancelled';
                             ?>
                             <tr>
-                                <td><span class="fw-bold"><?=htmlspecialchars($adj['request_no'])?></span></td>
-                                <td><?=htmlspecialchars($adj['full_name'])?></td>
-                                <td><?=htmlspecialchars($adj['department'])?></td>
+                                <td><span class="fw-bold"><?=htmlspecialchars($adj['request_no'] ?? 'N/A')?></span></td>
+                                <td><?=htmlspecialchars($adj['full_name'] ?? 'N/A')?></td>
+                                <td><?=htmlspecialchars($adj['department'] ?? 'N/A')?></td>
                                 <td><?=date('d-m-Y', strtotime($adj['attendance_date']))?></td>
-                                <td><?=htmlspecialchars($adj['adjustment_type'])?></td>
+                                <td><?=htmlspecialchars($adj['adjustment_type'] ?? 'N/A')?></td>
                                 <td><span class="badge-modern <?=$adjBadge?>"><?=$adj['status']?></span></td>
                                 <td>
                                 <?php

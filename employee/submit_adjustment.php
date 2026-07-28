@@ -50,13 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $query = "INSERT INTO attendance_adjustments 
               (request_no, employee_id, attendance_id, attendance_date, adjustment_type, 
-               requested_check_in, requested_check_out, reason, attachment, status, supervisor_status) 
+               requested_check_in, requested_check_out, reason, attachment, status) 
               VALUES 
               ('$request_no', '$employee_id', " . ($attendance_id ? "'$attendance_id'" : "NULL") . ", 
                '$attendance_date', '$adjustment_type', " . 
                ($requested_check_in ? "'$requested_check_in'" : "NULL") . ", " . 
                ($requested_check_out ? "'$requested_check_out'" : "NULL") . ", 
-               '$reason', '$attachment', 'Pending', 'Pending')";
+               '$reason', '$attachment', 'Pending')";
     
     if (mysqli_query($conn, $query)) {
         $success = "Adjustment request submitted successfully! Request #: $request_no";

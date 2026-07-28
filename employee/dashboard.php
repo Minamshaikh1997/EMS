@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../config/db.php");
+include_once("../config/employee_rights.php");
 
 if (!isset($_SESSION['employee_id'])) {
     header("Location: ../index.php");
@@ -16,7 +17,18 @@ if ($employee_role === 'Admin') {
     exit();
 }
 
-$employee = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM employees WHERE id='$employee_id' LIMIT 1"));
+// Get employee rights
+$employee_rights = getEmployeeRights($conn, $employee_id);
+
+$result = mysqli_query($conn, "SELECT * FROM employees WHERE id='$employee_id' LIMIT 1");
+
+if (!$result || mysqli_num_rows($result) === 0) {
+    header("Location: ../index.php?error=invalid_session");
+    exit();
+}
+
+$employee = mysqli_fetch_assoc($result);
+
 $photo = !empty($employee['photo']) ? $employee['photo'] : 'default.png';
 
 $totalLeaves = 0;
@@ -54,7 +66,7 @@ if ($todayAttendance && mysqli_num_rows($todayAttendance) > 0) {
 
 $balanceQuery = mysqli_query($conn, "SELECT * FROM leave_balance WHERE employee_id='$employee_id' LIMIT 1");
 if ($balanceQuery && mysqli_num_rows($balanceQuery) === 0) {
-    mysqli_query($conn, "INSERT INTO leave_balance (employee_id, casual_leave, sick_leave, annual_leave) VALUES ('$employee_id', 12, 10, 20)");
+    mysqli_query($conn, "INSERT INTO leave_balance (employee_id, casual_leave, sick_leave, annual_leave) VALUES ('$employee_id', 10, 10, 7)");
     $balanceQuery = mysqli_query($conn, "SELECT * FROM leave_balance WHERE employee_id='$employee_id' LIMIT 1");
 }
 $leaveBalance = ($balanceQuery) ? mysqli_fetch_assoc($balanceQuery) : ['casual_leave' => 0, 'sick_leave' => 0, 'annual_leave' => 0];
@@ -451,20 +463,41 @@ $designation = $employee['designation'] ?? $employee_role;
         <div class="sidebar-section-title">Main</div>
         <div class="sidebar-section-group">
         <a href="dashboard.php" class="sidebar-link active"><i class="fa fa-gauge"></i> Dashboard</a>
+        
+        <?php if ($employee_rights['can_view_attendance'] ?? 1): ?>
         <a href="attendance.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
         <a href="attendance_history.php" class="sidebar-link"><i class="fa fa-history"></i> Attendance History</a>
+        <?php endif; ?>
+        
+        <?php if ($employee_rights['can_apply_leave'] ?? 1): ?>
         <a href="apply_leave.php" class="sidebar-link"><i class="fa fa-calendar-plus"></i> Apply Leave</a>
         <a href="leave_history.php" class="sidebar-link"><i class="fa fa-list"></i> Leave History</a>
         <a href="leave_balance.php" class="sidebar-link"><i class="fa fa-chart-pie"></i> Leave Balance</a>
+        <?php endif; ?>
+        
+        <?php if ($employee_rights['can_submit_adjustment'] ?? 1): ?>
         <a href="submit_adjustment.php" class="sidebar-link"><i class="fa fa-pen-alt"></i> Submit Adjustment</a>
         <a href="my_adjustments.php" class="sidebar-link"><i class="fa fa-clipboard-list"></i> My Adjustments</a>
+        <?php endif; ?>
         </div>
 
         <div class="sidebar-section-title">Profile</div>
         <div class="sidebar-section-group">
+        <?php if ($employee_rights['can_edit_profile'] ?? 1): ?>
         <a href="edit_profile.php" class="sidebar-link"><i class="fa fa-user-edit"></i> Edit Profile</a>
         <a href="upload_photo.php" class="sidebar-link"><i class="fa fa-camera"></i> Upload Photo</a>
+        <?php endif; ?>
+        
+        <?php if ($employee_rights['can_change_password'] ?? 1): ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
+        <?php endif; ?>
+        </div>
+
+        <div class="sidebar-section-title">Payroll</div>
+        <div class="sidebar-section-group">
+        <?php if ($employee_rights['can_view_payroll'] ?? 1): ?>
+        <a href="my_payroll.php" class="sidebar-link"><i class="fa-solid fa-money-bill-wave"></i> My Payroll</a>
+        <?php endif; ?>
         </div>
 
         <div class="sidebar-section-title">System</div>
@@ -626,6 +659,7 @@ $designation = $employee['designation'] ?? $employee_role;
             </div>
             <div class="card-body-custom">
                 <div class="menu-grid">
+                    <?php if ($employee_rights['can_view_attendance'] ?? 1): ?>
                     <a href="attendance.php" class="menu-item mi-attendance">
                         <div class="menu-icon"><i class="fas fa-sign-in-alt"></i></div>
                         <span class="menu-label">Attendance</span>
@@ -634,6 +668,9 @@ $designation = $employee['designation'] ?? $employee_role;
                         <div class="menu-icon"><i class="fas fa-history"></i></div>
                         <span class="menu-label">History</span>
                     </a>
+                    <?php endif; ?>
+                    
+                    <?php if ($employee_rights['can_apply_leave'] ?? 1): ?>
                     <a href="apply_leave.php" class="menu-item mi-apply">
                         <div class="menu-icon"><i class="fas fa-plus-circle"></i></div>
                         <span class="menu-label">Apply Leave</span>
@@ -642,6 +679,13 @@ $designation = $employee['designation'] ?? $employee_role;
                         <div class="menu-icon"><i class="fas fa-list"></i></div>
                         <span class="menu-label">Leave History</span>
                     </a>
+                    <a href="leave_balance.php" class="menu-item mi-balance">
+                        <div class="menu-icon"><i class="fas fa-chart-pie"></i></div>
+                        <span class="menu-label">Leave Balance</span>
+                    </a>
+                    <?php endif; ?>
+                    
+                    <?php if ($employee_rights['can_submit_adjustment'] ?? 1): ?>
                     <a href="submit_adjustment.php" class="menu-item mi-adjustment">
                         <div class="menu-icon"><i class="fas fa-pen-alt"></i></div>
                         <span class="menu-label">Adjustment</span>
@@ -650,14 +694,14 @@ $designation = $employee['designation'] ?? $employee_role;
                         <div class="menu-icon"><i class="fas fa-clipboard-list"></i></div>
                         <span class="menu-label">My Adjustments</span>
                     </a>
+                    <?php endif; ?>
+                    
+                    <?php if ($employee_rights['can_change_password'] ?? 1): ?>
                     <a href="change_password.php" class="menu-item mi-password">
                         <div class="menu-icon"><i class="fas fa-key"></i></div>
                         <span class="menu-label">Password</span>
                     </a>
-                    <a href="leave_balance.php" class="menu-item mi-balance">
-                        <div class="menu-icon"><i class="fas fa-chart-pie"></i></div>
-                        <span class="menu-label">Leave Balance</span>
-                    </a>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
