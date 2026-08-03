@@ -646,6 +646,7 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     }
 });
 </script>
+<?php include __DIR__ . '/../config/back_dashboard.php'; ?>
 </body>
 </html>
 <?php

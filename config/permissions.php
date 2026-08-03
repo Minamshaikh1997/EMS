@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/security.php';
 /**
  * Permission Management System
  * Provides functions for checking and managing role-based permissions
@@ -22,7 +23,7 @@ if (!defined('EMS_ROOT')) {
  */
 function hasPermission($conn, $module, $permission = 'view') {
     // Super Admin always has all permissions
-    if (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'Super Admin') {
+    if (isset($_SESSION['admin_role']) && ems_canonical_admin_role($_SESSION['admin_role']) === 'Super Admin') {
         return true;
     }
 
@@ -171,7 +172,7 @@ function requireAnyPermission($conn, $module, $permissions = ['view']) {
  */
 function redirectToAccessDenied() {
     $_SESSION['access_denied_message'] = "Access Denied - You don't have permission to access this page.";
-    header("Location: " . EMS_ROOT . "/admin/access_denied.php");
+    header("Location: access_denied.php");
     exit();
 }
 
@@ -186,7 +187,7 @@ function getUserPermissions($conn, $module) {
     $permissions = [];
     
     // Super Admin gets all permissions
-    if (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'Super Admin') {
+    if (isset($_SESSION['admin_role']) && ems_canonical_admin_role($_SESSION['admin_role']) === 'Super Admin') {
         return ['view', 'create', 'edit', 'delete', 'approve', 'export'];
     }
 
@@ -392,7 +393,7 @@ function saveRolePermissions($conn, $role_id, $permissions) {
  * @return bool True if Super Admin, false otherwise
  */
 function isSuperAdmin() {
-    return isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'Super Admin';
+    return isset($_SESSION['admin_role']) && ems_canonical_admin_role($_SESSION['admin_role']) === 'Super Admin';
 }
 
 /**
@@ -404,7 +405,7 @@ function isAdminOrHigher() {
     if (!isset($_SESSION['admin_role'])) {
         return false;
     }
-    return in_array($_SESSION['admin_role'], ['Super Admin', 'Admin']);
+    return in_array(ems_canonical_admin_role($_SESSION['admin_role']), ['Super Admin', 'Admin'], true);
 }
 
 /**

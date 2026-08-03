@@ -158,8 +158,12 @@ $componentReport = mysqli_query($conn, "
         <div class="sidebar-section-group">
             <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
             <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
-            <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
-            <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
+        <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
+        <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
+        <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
+        <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
+        <a href="manage_shifts.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Manage Shifts</a>
             <a href="attendance_report.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
             <a href="reports.php" class="sidebar-link"><i class="fa fa-chart-column"></i> Reports</a>
         </div>
@@ -180,7 +184,8 @@ $componentReport = mysqli_query($conn, "
         <div class="sidebar-section-group">
             <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
             <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
-            <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
             <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
             <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -365,16 +370,15 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
 
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');
@@ -384,5 +388,6 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
 });
 </script>
 
+<?php include __DIR__ . '/../config/back_dashboard.php'; ?>
 </body>
 </html>

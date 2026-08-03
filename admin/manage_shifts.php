@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 
 if (!isset($_SESSION['admin'])) {
     header("Location: ../index.html");
@@ -7,47 +8,53 @@ if (!isset($_SESSION['admin'])) {
 }
 
 include("../config/db.php");
+include_once("../config/audit.php");
+
+if (!in_array($_SESSION['admin_role'] ?? '', ['Super Admin', 'Admin', 'Operations Manager', 'WFM Executive'], true)) {
+    http_response_code(403);
+    exit('You do not have permission to manage shifts.');
+}
 
 $admin_name = $_SESSION['admin_name'] ?? 'Admin';
 $admin_id = $_SESSION['admin_id'] ?? 0;
 
 // Delete history record
-if (isset($_GET['delete_history'])) {
-    $history_id = intval($_GET['delete_history']);
-    mysqli_query($conn, "DELETE FROM shift_history WHERE id='$history_id'");
+if (isset($_POST['delete_history'])) {
+    ems_verify_csrf();
+    $history_id = intval($_POST['delete_history']);
+    $stmt = $conn->prepare("DELETE FROM shift_history WHERE id=?");
+    $stmt->bind_param('i', $history_id);
+    $stmt->execute();
+    $stmt->close();
+    ems_audit($conn, 'shift.history_deleted', 'shift_history', $history_id);
     $success = "Shift history record deleted.";
 }
 
 // Process shift update
 if (isset($_POST['update_shift'])) {
+    ems_verify_csrf();
     $emp_id = intval($_POST['emp_id']);
-    $shift_name = mysqli_real_escape_string($conn, $_POST['shift_name']);
-    $shift_start = mysqli_real_escape_string($conn, $_POST['shift_start_time']);
-    $shift_end = mysqli_real_escape_string($conn, $_POST['shift_end_time']);
+    $shift_name = trim((string)($_POST['shift_name'] ?? ''));
+    $shift_start = trim((string)($_POST['shift_start_time'] ?? ''));
+    $shift_end = trim((string)($_POST['shift_end_time'] ?? ''));
+    $effective_date = trim((string)($_POST['effective_date'] ?? date('Y-m-d')));
+    if ($emp_id < 1 || $shift_name === '' || strlen($shift_name) > 100 || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_start) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_end) || !preg_match('/^\d{4}-\d{2}-\d{2}$/',$effective_date)) { http_response_code(422); exit('Invalid shift details.'); }
 
     // Get old shift data
-    $old_data = mysqli_fetch_assoc(mysqli_query($conn, "SELECT shift_name, shift_start_time, shift_end_time FROM employees WHERE id='$emp_id'"));
+    $stmt=$conn->prepare('SELECT shift_name,shift_start_time,shift_end_time FROM employees WHERE id=?'); $stmt->bind_param('i',$emp_id); $stmt->execute(); $old_data=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    if (!$old_data) { http_response_code(404); exit('Employee not found.'); }
     $old_shift_name = $old_data['shift_name'] ?? '';
     $old_shift_start = $old_data['shift_start_time'] ?? '09:00:00';
     $old_shift_end = $old_data['shift_end_time'] ?? '17:00:00';
 
-    $effective_date = mysqli_real_escape_string($conn, $_POST['effective_date'] ?? date('Y-m-d'));
-
-    // Update employee's current shift
-    mysqli_query($conn, "UPDATE employees SET 
-        shift_name='$shift_name',
-        shift_start_time='$shift_start',
-        shift_end_time='$shift_end'
-        WHERE id='$emp_id'");
-
-    // Save to shift_history with date
-    mysqli_query($conn, "INSERT INTO shift_history 
-        (employee_id, old_shift_name, old_shift_start, old_shift_end, 
-         new_shift_name, new_shift_start, new_shift_end, 
-         effective_date, changed_by) VALUES 
-        ('$emp_id', '$old_shift_name', '$old_shift_start', '$old_shift_end',
-         '$shift_name', '$shift_start', '$shift_end',
-         '$effective_date', '$admin_id')");
+    mysqli_begin_transaction($conn);
+    try {
+        $stmt=$conn->prepare('UPDATE employees SET shift_name=?,shift_start_time=?,shift_end_time=? WHERE id=?'); $stmt->bind_param('sssi',$shift_name,$shift_start,$shift_end,$emp_id); $stmt->execute(); $stmt->close();
+        $stmt=$conn->prepare('INSERT INTO shift_history (employee_id,old_shift_name,old_shift_start,old_shift_end,new_shift_name,new_shift_start,new_shift_end,effective_date,changed_by) VALUES (?,?,?,?,?,?,?,?,?)');
+        $stmt->bind_param('isssssssi',$emp_id,$old_shift_name,$old_shift_start,$old_shift_end,$shift_name,$shift_start,$shift_end,$effective_date,$admin_id); $stmt->execute(); $historyId=(int)$conn->insert_id; $stmt->close();
+        ems_audit($conn, 'shift.updated', 'employee', $emp_id, ['history_id'=>$historyId,'effective_date'=>$effective_date]);
+        mysqli_commit($conn);
+    } catch(Throwable $error) { mysqli_rollback($conn); error_log('Shift update failed: '.$error->getMessage()); http_response_code(500); exit('Shift could not be updated.'); }
 
     $success = "Shift updated successfully effective from " . date('d-m-Y', strtotime($effective_date)) . ".";
 }
@@ -189,7 +196,8 @@ $total_filtered = mysqli_num_rows($employees);
                                 $history_id = 'hist_' . $emp['id'];
                             ?>
                                 <tr>
-                                    <form method="POST">
+<form method="POST">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                                         <input type="hidden" name="emp_id" value="<?php echo $emp['id']; ?>">
                                         <td class="text-center">
                                             <?php if ($has_history): ?>
@@ -254,9 +262,11 @@ $total_filtered = mysqli_num_rows($employees);
                                                             <td><?php echo date('d-m-Y', strtotime($h['effective_date'])); ?></td>
                                                             <td><?php echo htmlspecialchars($h['changed_by_name'] ?? 'Admin'); ?></td>
                                                             <td>
-                                                                <a href="?delete_history=<?php echo $h['id']; ?>" class="btn btn-danger btn-sm" onclick="return confirm('Delete this shift history record?')">
-                                                                    <i class="fas fa-trash"></i>
-                                                                </a>
+                                                                <form method="POST" class="d-inline" onsubmit="return confirm('Delete this shift history record?')">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
+                                                                    <input type="hidden" name="delete_history" value="<?php echo (int)$h['id']; ?>">
+                                                                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                                                </form>
                                                             </td>
                                                         </tr>
                                                     <?php endwhile; ?>

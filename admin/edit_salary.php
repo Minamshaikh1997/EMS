@@ -2,10 +2,16 @@
 session_start();
 include("admincheck_role.php");
 include("../config/db.php");
+include_once("../config/audit.php");
 
 if(!isset($_SESSION['admin'])){
     header("Location: ../index.html");
     exit();
+}
+
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Finance Manager', 'Accountant'], true)) {
+    http_response_code(403);
+    exit('You do not have permission to edit salary information.');
 }
 
 $id = intval($_GET['id']);
@@ -23,39 +29,27 @@ $data = mysqli_fetch_assoc($result);
 if(isset($_POST['update']))
 {
 
-$basic=$_POST['basic_salary'];
+ems_verify_csrf();
 
-$house=$_POST['house_allowance'];
+$basic=max(0, (float)$_POST['basic_salary']);
 
-$medical=$_POST['medical_allowance'];
+$house=max(0, (float)$_POST['house_allowance']);
 
-$transport=$_POST['transport_allowance'];
+$medical=max(0, (float)$_POST['medical_allowance']);
 
-$other=$_POST['other_allowance'];
+$transport=max(0, (float)$_POST['transport_allowance']);
 
-$tax=$_POST['tax_deduction'];
+$other=max(0, (float)$_POST['other_allowance']);
 
-$deduction=$_POST['other_deduction'];
+$tax=max(0, (float)$_POST['tax_deduction']);
 
-mysqli_query($conn,"
-UPDATE salary_structure SET
+$deduction=max(0, (float)$_POST['other_deduction']);
 
-basic_salary='$basic',
-
-house_allowance='$house',
-
-medical_allowance='$medical',
-
-transport_allowance='$transport',
-
-other_allowance='$other',
-
-tax_deduction='$tax',
-
-other_deduction='$deduction'
-
-WHERE id='$id'
-");
+$stmt = $conn->prepare('UPDATE salary_structure SET basic_salary=?,house_allowance=?,medical_allowance=?,transport_allowance=?,other_allowance=?,tax_deduction=?,other_deduction=? WHERE id=?');
+$stmt->bind_param('dddddddi', $basic, $house, $medical, $transport, $other, $tax, $deduction, $id);
+$stmt->execute();
+$stmt->close();
+ems_audit($conn, 'salary.updated', 'salary_structure', $id, ['basic_salary' => $basic]);
 
 header("Location: salary_structure.php");
 exit();
@@ -98,6 +92,8 @@ Edit Salary Structure
 <div class="card-body">
 
 <form method="POST">
+
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
 
 <div class="row">
 

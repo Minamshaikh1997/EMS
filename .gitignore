@@ -1,0 +1,22 @@
+# Runtime uploads and private employee documents
+/uploads/*
+!/uploads/.htaccess
+
+# Environment-specific secrets
+.env
+.env.*
+!.env.example
+
+# Generated office files and local tooling output
+/*.docx
+/qa_datasheet/
+/qa_quotation/
+/storage/backups/*
+!/storage/backups/.htaccess
+
+# Logs, caches and editor/OS files
+*.log
+.DS_Store
+Thumbs.db
+/.vscode/
+/.cursor/

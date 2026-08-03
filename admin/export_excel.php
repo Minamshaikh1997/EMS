@@ -1,4 +1,3 @@
-```php
 <?php
 session_start();
 
@@ -43,6 +42,12 @@ $sql .= " ORDER BY leave_requests.id DESC";
 
 $result = mysqli_query($conn,$sql);
 
+function safeExcelCell($value) {
+    $value = (string)$value;
+    if (preg_match('/^[=+\-@]/', $value)) $value = "'" . $value;
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
 echo "<table border='1'>";
 
 echo "<tr style='font-weight:bold;background:#cccccc;'>
@@ -60,18 +65,17 @@ while($row=mysqli_fetch_assoc($result))
 {
     echo "<tr>";
 
-    echo "<td>".$row['employee_id']."</td>";
-    echo "<td>".$row['full_name']."</td>";
-    echo "<td>".$row['department']."</td>";
-    echo "<td>".$row['leave_type']."</td>";
-    echo "<td>".$row['start_date']."</td>";
-    echo "<td>".$row['end_date']."</td>";
-    echo "<td>".$row['total_days']."</td>";
-    echo "<td>".$row['status']."</td>";
+    echo "<td>".safeExcelCell($row['employee_id'])."</td>";
+    echo "<td>".safeExcelCell($row['full_name'])."</td>";
+    echo "<td>".safeExcelCell($row['department'])."</td>";
+    echo "<td>".safeExcelCell($row['leave_type'])."</td>";
+    echo "<td>".safeExcelCell($row['start_date'])."</td>";
+    echo "<td>".safeExcelCell($row['end_date'])."</td>";
+    echo "<td>".safeExcelCell($row['total_days'])."</td>";
+    echo "<td>".safeExcelCell($row['status'])."</td>";
 
     echo "</tr>";
 }
 
 echo "</table>";
 ?>
-```

@@ -8,12 +8,15 @@ if (!isset($_SESSION['admin'])) {
 
 include("../config/db.php");
 include("admincheck_role.php");
+include_once("../config/employee_management.php");
 
 $departments = mysqli_query($conn, "SELECT * FROM departments ORDER BY department_name");
 
 $search = isset($_GET['search']) ? mysqli_real_escape_string($conn,$_GET['search']) : "";
 $department = isset($_GET['department']) ? mysqli_real_escape_string($conn,$_GET['department']) : "";
 $role = isset($_GET['role']) ? mysqli_real_escape_string($conn,$_GET['role']) : "";
+$status = isset($_GET['status']) ? mysqli_real_escape_string($conn,$_GET['status']) : "";
+$employeeManagementReady = employeeManagementSchemaReady($conn);
 
 $sql = "SELECT * FROM employees WHERE 1=1";
 
@@ -23,6 +26,7 @@ if($search!="")
         employee_id LIKE '%$search%'
         OR full_name LIKE '%$search%'
         OR email LIKE '%$search%'
+        " . ($employeeManagementReady ? "OR cnic LIKE '%$search%'" : "") . "
     )";
 }
 
@@ -34,6 +38,11 @@ if($department!="")
 if($role!="")
 {
     $sql .= " AND role='$role'";
+}
+
+if($status!="")
+{
+    $sql .= " AND status='$status'";
 }
 
 $sql .= " ORDER BY id DESC";
@@ -127,6 +136,7 @@ function getReportingName($conn, $id) {
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -160,16 +170,18 @@ function getReportingName($conn, $id) {
         <div class="card-modern">
             <div class="card-header-custom">
                 <h5><i class="fa fa-users"></i> Employee List</h5>
-                <a href="add_employee.php" class="btn btn-success rounded-pill px-3">
-                    <i class="fa fa-user-plus"></i> Add Employee
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="export_employee_records.php?<?php echo htmlspecialchars(http_build_query($_GET)); ?>" class="btn btn-outline-primary rounded-pill px-3"><i class="fa fa-file-csv"></i> Export Records</a>
+                    <a href="import_employees.php" class="btn btn-outline-success rounded-pill px-3"><i class="fa fa-file-import"></i> Import</a>
+                    <a href="add_employee.php" class="btn btn-success rounded-pill px-3"><i class="fa fa-user-plus"></i> Add Employee</a>
+                </div>
             </div>
             <div class="card-body-custom p-0">
                 <!-- Filters -->
                 <div class="p-3 border-bottom bg-light">
                     <form method="GET" class="row g-2">
                         <div class="col-md-4">
-                            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by ID, Name or Email..." value="<?php echo isset($_GET['search']) ? $_GET['search'] : ''; ?>">
+                            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search by ID, Name, Email or CNIC..." value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>">
                         </div>
                         <div class="col-md-3">
                             <select name="department" class="form-control form-control-sm">
@@ -248,9 +260,15 @@ function getReportingName($conn, $id) {
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
+                                        <a href="employee_record.php?id=<?php echo $row['id']; ?>" class="btn btn-outline-info" title="Complete HR Record"><i class="fa fa-address-card"></i></a>
                                         <a href="edit_employee.php?id=<?php echo $row['id']; ?>" class="btn btn-outline-primary" title="Edit"><i class="fa fa-edit"></i></a>
                                         <?php if ($status != 'Active') { ?>
-                                            <a href="delete_employee.php?id=<?php echo $row['id']; ?>&action=activate" class="btn btn-outline-success" title="Activate"><i class="fa fa-check"></i></a>
+                                            <form method="POST" action="delete_employee.php" class="d-inline">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
+                                                <input type="hidden" name="id" value="<?php echo (int)$row['id']; ?>">
+                                                <input type="hidden" name="action" value="activate">
+                                                <button type="submit" class="btn btn-outline-success" title="Activate"><i class="fa fa-check"></i></button>
+                                            </form>
                                         <?php } else { ?>
                                             <a href="delete_employee.php?id=<?php echo $row['id']; ?>&action=confirm" class="btn btn-outline-warning" title="Deactivate"><i class="fa fa-ban"></i></a>
                                         <?php } ?>
@@ -304,17 +322,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');
@@ -323,5 +340,6 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     }
 });
 </script>
+<?php include __DIR__ . '/../config/back_dashboard.php'; ?>
 </body>
 </html>

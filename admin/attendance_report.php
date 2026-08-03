@@ -477,7 +477,11 @@ body.dark-mode {
     <!-- Page Header -->
     <div class="page-header">
         <h2><i class="fa-solid fa-clock"></i> Attendance Report <small>/ Track employee attendance</small></h2>
-        <a href="export_excel.php" class="btn btn-success rounded-pill px-4"><i class="fa fa-file-excel"></i> Export Excel</a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="attendance_control.php" class="btn btn-primary rounded-pill px-4"><i class="fa fa-calendar-check"></i> Control & Lock</a>
+            <a href="attendance_policy.php" class="btn btn-outline-primary rounded-pill px-4"><i class="fa fa-sliders"></i> Policy</a>
+            <a href="export_excel.php" class="btn btn-success rounded-pill px-4"><i class="fa fa-file-excel"></i> Export Excel</a>
+        </div>
     </div>
 
     <!-- Stats Cards -->

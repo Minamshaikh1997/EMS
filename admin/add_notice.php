@@ -8,40 +8,32 @@ if(!isset($_SESSION['admin']))
 }
 
 include("../config/db.php");
+include_once("../config/audit.php");
 include("admincheck_role.php");
+
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'], true)) { http_response_code(403); exit('Access denied.'); }
 
 // Add Notice
 if(isset($_POST['save']))
 {
-    $title = mysqli_real_escape_string($conn,$_POST['title']);
-    $notice = mysqli_real_escape_string($conn,$_POST['notice']);
-
-    mysqli_query($conn,"
-    INSERT INTO notices
-    (
-        title,
-        notice
-    )
-    VALUES
-    (
-        '$title',
-        '$notice'
-    )
-    ");
+    ems_verify_csrf();
+    $title = trim((string)($_POST['title'] ?? ''));
+    $notice = trim((string)($_POST['notice'] ?? ''));
+    if ($title === '' || strlen($title) > 200 || $notice === '' || strlen($notice) > 5000) { http_response_code(422); exit('Invalid notice details.'); }
+    $stmt=$conn->prepare('INSERT INTO notices (title,notice) VALUES (?,?)'); $stmt->bind_param('ss',$title,$notice); $stmt->execute(); $id=(int)$conn->insert_id; $stmt->close();
+    ems_audit($conn, 'notice.created', 'notice', $id);
 
     header("Location: add_notice.php");
     exit();
 }
 
 // Delete Notice
-if(isset($_GET['delete']))
+if(isset($_POST['delete']))
 {
-    $id = intval($_GET['delete']);
-
-    mysqli_query($conn,"
-    DELETE FROM notices
-    WHERE id='$id'
-    ");
+    ems_verify_csrf();
+    $id = intval($_POST['delete']);
+    $stmt=$conn->prepare('DELETE FROM notices WHERE id=?'); $stmt->bind_param('i',$id); $stmt->execute(); $stmt->close();
+    ems_audit($conn, 'notice.deleted', 'notice', $id);
 
     header("Location: add_notice.php");
     exit();
@@ -122,6 +114,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -147,6 +140,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="add_notice.php" class="sidebar-link active"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -173,7 +167,8 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
                 <h5><i class="fa fa-plus-circle"></i> Add New Notice</h5>
             </div>
             <div class="card-body-custom">
-                <form method="POST">
+<form method="POST">
+<input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Notice Title</label>
@@ -209,7 +204,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
                                 <td><?php echo htmlspecialchars($row['notice']); ?></td>
                                 <td><?php echo date("d-m-Y",strtotime($row['created_at'])); ?></td>
                                 <td>
-                                    <a href="?delete=<?php echo $row['id']; ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this notice?')"><i class="fa fa-trash"></i> Delete</a>
+                                    <form method="post" class="d-inline" onsubmit="return confirm('Delete this notice?')"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(ems_csrf_token())?>"><button name="delete" value="<?=(int)$row['id']?>" class="btn btn-outline-danger btn-sm"><i class="fa fa-trash"></i> Delete</button></form>
                                 </td>
                             </tr>
                         <?php } ?>
@@ -258,17 +253,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');
@@ -277,5 +271,6 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     }
 });
 </script>
+<?php include __DIR__ . '/../config/back_dashboard.php'; ?>
 </body>
 </html>

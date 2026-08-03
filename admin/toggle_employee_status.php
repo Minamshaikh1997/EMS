@@ -1,9 +1,17 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 include("admincheck_role.php");
 include("../config/db.php");
+include_once("../config/audit.php");
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('Method not allowed.');
+}
+ems_verify_csrf();
 
 // Only Managers (Super Admin, Admin, Operations Manager) can change employee status
 if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'])) {
@@ -12,8 +20,8 @@ if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'])) {
     exit();
 }
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$action = isset($_GET['action']) ? $_GET['action'] : '';
+$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+$action = isset($_POST['action']) ? $_POST['action'] : '';
 
 if ($id <= 0 || !in_array($action, ['activate', 'deactivate'])) {
     $_SESSION['status_error'] = "Invalid request!";
@@ -45,6 +53,7 @@ if ($action == 'activate') {
 }
 
 if (mysqli_query($conn, $updateQuery)) {
+    ems_audit($conn, 'employee.status_changed', 'employee', $id, ['status' => $action === 'activate' ? 'Active' : 'Inactive']);
     $_SESSION['status_success'] = $message;
 } else {
     $_SESSION['status_error'] = $errorMsg . " MySQL Error: " . mysqli_error($conn);

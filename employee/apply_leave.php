@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 
 if (!isset($_SESSION['employee_id'])) {
     header("Location: login.php");
@@ -10,14 +11,22 @@ include("../config/db.php");
 
 if(isset($_POST['apply']))
 {
+    ems_verify_csrf();
     $employee_id = $_SESSION['employee_id'];
-    $leave_type = $_POST['leave_type'];
-    $start_date = $_POST['start_date'];
-    $end_date = $_POST['end_date'];
-    $reason = $_POST['reason'];
+    $leave_type = (string)($_POST['leave_type'] ?? '');
+    $start_date = (string)($_POST['start_date'] ?? '');
+    $end_date = (string)($_POST['end_date'] ?? '');
+    $reason = trim((string)($_POST['reason'] ?? ''));
 
+    if (!in_array($leave_type, ['Annual', 'Sick', 'Casual'], true)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $start_date)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end_date)
+        || $reason === '' || strlen($reason) > 1000)
+    {
+        $msg = "Please provide valid leave details.";
+    }
     // Check if End Date is before Start Date
-    if(strtotime($end_date) < strtotime($start_date))
+    elseif(strtotime($end_date) < strtotime($start_date))
     {
         $msg = "End Date cannot be earlier than Start Date.";
     }
@@ -52,17 +61,19 @@ if(isset($_POST['apply']))
         {
             $sql = "INSERT INTO leave_requests
             (employee_id, leave_type, start_date, end_date, total_days, reason)
-            VALUES
-            ('$employee_id','$leave_type','$start_date','$end_date','$days','$reason')";
+            VALUES (?, ?, ?, ?, ?, ?)";
 
-            if(mysqli_query($conn, $sql))
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param('isssis', $employee_id, $leave_type, $start_date, $end_date, $days, $reason);
+            if($stmt->execute())
             {
                 $msg = "Leave Applied Successfully.";
             }
             else
             {
-                $msg = "Error: " . mysqli_error($conn);
+                $msg = "The leave request could not be submitted.";
             }
+            $stmt->close();
         }
     }
 }
@@ -107,6 +118,7 @@ if(isset($msg))
 ?>
 
 <form method="POST">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
 
 <div class="mb-3">
 <label>Leave Type</label>

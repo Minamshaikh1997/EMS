@@ -1,6 +1,6 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 // Enable MySQL error reporting
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
@@ -33,7 +33,6 @@ $inactiveEmployees = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS 
 $conn = ensure_db_connection($conn);
 
 // Ensure employee_id column exists
-mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS employee_id VARCHAR(50) DEFAULT NULL AFTER id");
 
 // Employee status list for table
 $employeeStatusList = mysqli_query($conn, "
@@ -316,6 +315,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
         <a href="dashboard.php" class="sidebar-link active"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -341,6 +341,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -473,13 +474,19 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
                                     <div class="btn-group btn-group-sm">
                                         <?php if($canManageStatus): ?>
                                             <?php if($isActuallyActive): ?>
-                                            <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=deactivate" class="btn btn-outline-warning" onclick="return confirm('Deactivate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')" title="Deactivate">
-                                                    <i class="fa fa-pause-circle"></i> Deactivate
-                                                </a>
+                                            <form method="POST" action="toggle_employee_status.php" class="d-inline" onsubmit="return confirm('Deactivate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
+                                                <input type="hidden" name="id" value="<?= (int)$emp['id'] ?>">
+                                                <input type="hidden" name="action" value="deactivate">
+                                                <button type="submit" class="btn btn-outline-warning" title="Deactivate"><i class="fa fa-pause-circle"></i> Deactivate</button>
+                                            </form>
                                             <?php else: ?>
-                                            <a href="toggle_employee_status.php?id=<?=$emp['id']?>&action=activate" class="btn btn-outline-success" onclick="return confirm('Activate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')" title="Activate">
-                                                    <i class="fa fa-play-circle"></i> Activate
-                                                </a>
+                                            <form method="POST" action="toggle_employee_status.php" class="d-inline" onsubmit="return confirm('Activate <?=htmlspecialchars($emp['full_name'] ?? 'N/A')?>?')">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
+                                                <input type="hidden" name="id" value="<?= (int)$emp['id'] ?>">
+                                                <input type="hidden" name="action" value="activate">
+                                                <button type="submit" class="btn btn-outline-success" title="Activate"><i class="fa fa-play-circle"></i> Activate</button>
+                                            </form>
                                             <?php endif; ?>
                                             <a href="edit_employee.php?id=<?=$emp['id']?>" class="btn btn-outline-primary" title="Edit">
                                                 <i class="fa fa-edit"></i>
@@ -835,17 +842,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

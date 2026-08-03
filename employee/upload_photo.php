@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 
 if(!isset($_SESSION['employee_id']))
 {
@@ -23,18 +24,22 @@ $employee = mysqli_fetch_assoc($result);
 if(isset($_POST['upload']))
 {
 
+    ems_verify_csrf();
+
     if(isset($_FILES['photo']) && $_FILES['photo']['error']==0)
     {
 
-        $fileName = $_FILES['photo']['name'];
         $tmpName = $_FILES['photo']['tmp_name'];
         $size = $_FILES['photo']['size'];
 
-        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($tmpName);
+        $allowed = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+        ];
 
-        $allowed = array("jpg","jpeg","png");
-
-        if(!in_array($extension,$allowed))
+        if(!isset($allowed[$mime]) || @getimagesize($tmpName) === false)
         {
 
             echo "<script>
@@ -53,7 +58,8 @@ if(isset($_POST['upload']))
         else
         {
 
-            $newName = "EMP_".$employee_id."_".time().".".$extension;
+            $extension = $allowed[$mime];
+            $newName = "EMP_".$employee_id."_".bin2hex(random_bytes(16)).".".$extension;
 
             $uploadPath = "../uploads/".$newName;
 
@@ -64,7 +70,7 @@ if(isset($_POST['upload']))
                 if(!empty($employee['photo']))
                 {
 
-                    $oldPhoto = "../uploads/".$employee['photo'];
+                    $oldPhoto = "../uploads/".basename($employee['photo']);
 
                     if(file_exists($oldPhoto))
                     {
@@ -167,6 +173,8 @@ class="rounded-circle border">
 </div>
 
 <form method="POST" enctype="multipart/form-data">
+
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
 
 <div class="mb-3">
 

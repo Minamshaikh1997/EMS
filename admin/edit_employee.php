@@ -9,6 +9,12 @@ if (!isset($_SESSION['admin'])) {
 include("../config/db.php");
 include("admincheck_role.php");
 include_once("roles_helper.php");
+include_once("../config/employee_management.php");
+
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'], true)) {
+    http_response_code(403);
+    exit('You do not have permission to edit employee records.');
+}
 
 // Load Departments
 $departments = mysqli_query($conn, "SELECT * FROM departments ORDER BY department_name");
@@ -31,24 +37,41 @@ $manageableRoles = getManageableRoles($conn);
 // Update Employee
 if(isset($_POST['update']))
 {
-    $employee_id   = $_POST['employee_id'];
-    $full_name     = $_POST['full_name'];
-    $email         = $_POST['email'];
-    $role          = isset($_POST['role']) ? $_POST['role'] : 'Employee';
-    $department    = $_POST['department'];
-    $designation   = $_POST['designation'];
-    $joining_date  = $_POST['joining_date'];
-    $shift_name    = !empty($_POST['shift_name']) ? $_POST['shift_name'] : 'Morning';
-    $shift_start_time = !empty($_POST['shift_start_time']) ? $_POST['shift_start_time'] : '09:00';
-    $shift_end_time   = !empty($_POST['shift_end_time']) ? $_POST['shift_end_time'] : '17:00';
-    $annual_leave  = $_POST['annual_leave'];
-    $sick_leave    = $_POST['sick_leave'];
-    $casual_leave  = $_POST['casual_leave'];
+    ems_verify_csrf();
+    $oldSnapshot = [
+        'status' => $row['status'] ?? '',
+        'department' => $row['department'] ?? '',
+        'designation' => $row['designation'] ?? '',
+        'role' => $row['role'] ?? ''
+    ];
+    $employee_id   = trim((string)($_POST['employee_id'] ?? ''));
+    $full_name     = trim((string)($_POST['full_name'] ?? ''));
+    $email         = trim((string)($_POST['email'] ?? ''));
+    $role          = trim((string)($_POST['role'] ?? 'Employee'));
+    $department    = trim((string)($_POST['department'] ?? ''));
+    $designation   = trim((string)($_POST['designation'] ?? ''));
+    $joining_date  = trim((string)($_POST['joining_date'] ?? ''));
+    $shift_name    = !empty($_POST['shift_name']) ? trim((string)$_POST['shift_name']) : 'Morning';
+    $shift_start_time = !empty($_POST['shift_start_time']) ? trim((string)$_POST['shift_start_time']) : '09:00';
+    $shift_end_time   = !empty($_POST['shift_end_time']) ? trim((string)$_POST['shift_end_time']) : '17:00';
+    $annual_leave  = max(0, intval($_POST['annual_leave']));
+    $sick_leave    = max(0, intval($_POST['sick_leave']));
+    $casual_leave  = max(0, intval($_POST['casual_leave']));
     $status = isset($_POST['status']) ? $_POST['status'] : 'Active';
     $reporting_manager_id = isset($_POST['reporting_manager_id']) ? intval($_POST['reporting_manager_id']) : 0;
     $reporting_supervisor_id = isset($_POST['reporting_supervisor_id']) ? intval($_POST['reporting_supervisor_id']) : 0;
     $reporting_team_lead_id = isset($_POST['reporting_team_lead_id']) ? intval($_POST['reporting_team_lead_id']) : 0;
     $can_view_payroll = isset($_POST['can_view_payroll']) ? 1 : 0;
+
+    if ($employee_id === '' || trim($full_name) === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || !array_key_exists($role, $ROLE_HIERARCHY)
+        || !in_array($status, ['Active', 'Inactive', 'Suspended', 'Terminated'], true)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $joining_date)
+        || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $shift_start_time)
+        || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $shift_end_time)) {
+        http_response_code(422);
+        exit('Invalid employee details. Please go back and correct the form.');
+    }
     
     // Get employee rights
     $rights = [
@@ -61,56 +84,35 @@ if(isset($_POST['update']))
         'can_change_password' => isset($_POST['rights']['can_change_password']) ? 1 : 0
     ];
 
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_name VARCHAR(100) DEFAULT 'Morning'");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_start_time TIME DEFAULT '09:00:00'");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS shift_end_time TIME DEFAULT '17:00:00'");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS status ENUM('Active','Inactive','Suspended','Terminated') DEFAULT 'Active'");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_manager_id INT DEFAULT NULL");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_supervisor_id INT DEFAULT NULL");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_team_lead_id INT DEFAULT NULL");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_payroll TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_apply_leave TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_attendance TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_submit_adjustment TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_profile TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_reports TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_change_password TINYINT(1) DEFAULT 1");
-
     $is_active = ($status == 'Active') ? 1 : 0;
 
-    mysqli_query($conn,"UPDATE employees SET
-        employee_id='$employee_id',
-        full_name='$full_name',
-        email='$email',
-        role='$role',
-        department='$department',
-        designation='$designation',
-        joining_date='$joining_date',
-        shift_name='$shift_name',
-        shift_start_time='$shift_start_time',
-        shift_end_time='$shift_end_time',
-        annual_leave='$annual_leave',
-        sick_leave='$sick_leave',
-        casual_leave='$casual_leave',
-        status='$status',
-        is_active='$is_active',
-        reporting_manager_id='$reporting_manager_id',
-        reporting_supervisor_id='$reporting_supervisor_id',
-        reporting_team_lead_id='$reporting_team_lead_id',
-        can_view_payroll='$can_view_payroll',
-        can_apply_leave='{$rights['can_apply_leave']}',
-        can_view_attendance='{$rights['can_view_attendance']}',
-        can_submit_adjustment='{$rights['can_submit_adjustment']}',
-        can_edit_profile='{$rights['can_edit_profile']}',
-        can_view_reports='{$rights['can_view_reports']}',
-        can_change_password='{$rights['can_change_password']}'
-        WHERE id='$id'
-    ");
+    $canApplyLeave = $rights['can_apply_leave'];
+    $canViewAttendance = $rights['can_view_attendance'];
+    $canSubmitAdjustment = $rights['can_submit_adjustment'];
+    $canEditProfile = $rights['can_edit_profile'];
+    $canViewReports = $rights['can_view_reports'];
+    $canChangePassword = $rights['can_change_password'];
+    $stmt = $conn->prepare('UPDATE employees SET employee_id=?,full_name=?,email=?,role=?,department=?,designation=?,joining_date=?,shift_name=?,shift_start_time=?,shift_end_time=?,annual_leave=?,sick_leave=?,casual_leave=?,status=?,is_active=?,reporting_manager_id=?,reporting_supervisor_id=?,reporting_team_lead_id=?,can_view_payroll=?,can_apply_leave=?,can_view_attendance=?,can_submit_adjustment=?,can_edit_profile=?,can_view_reports=?,can_change_password=? WHERE id=?');
+    $types = str_repeat('s', 10) . 'iii' . 's' . str_repeat('i', 12);
+    $stmt->bind_param($types, $employee_id, $full_name, $email, $role, $department, $designation, $joining_date, $shift_name, $shift_start_time, $shift_end_time, $annual_leave, $sick_leave, $casual_leave, $status, $is_active, $reporting_manager_id, $reporting_supervisor_id, $reporting_team_lead_id, $can_view_payroll, $canApplyLeave, $canViewAttendance, $canSubmitAdjustment, $canEditProfile, $canViewReports, $canChangePassword, $id);
+    $updated = $stmt->execute();
+    $stmt->close();
 
-    echo "<script>
-    alert('Employee Updated Successfully');
-    window.location='employee.php';
-    </script>";
+    if ($updated && employeeManagementSchemaReady($conn)) {
+        $newSnapshot = ['status' => $status, 'department' => $department, 'designation' => $designation, 'role' => $role];
+        logEmployeeHistory($conn, $id, 'Profile Updated', json_encode($oldSnapshot), json_encode($newSnapshot), 'Core job and access details updated.');
+        if ($oldSnapshot['status'] !== $status) {
+            logEmployeeHistory($conn, $id, 'Status Changed', $oldSnapshot['status'], $status, null);
+        }
+        if ($oldSnapshot['department'] !== $department) {
+            logEmployeeHistory($conn, $id, 'Department Changed', $oldSnapshot['department'], $department, null);
+        }
+        if ($oldSnapshot['designation'] !== $designation) {
+            logEmployeeHistory($conn, $id, 'Designation Changed', $oldSnapshot['designation'], $designation, null);
+        }
+    }
+
+    echo "<script>alert('Employee Updated Successfully'); window.location='employee_record.php?id=$id';</script>";
 
     exit();
 }
@@ -247,6 +249,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -272,6 +275,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -305,13 +309,15 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <div class="card-modern">
             <div class="card-header-custom">
                 <h5><i class="fa fa-edit"></i> Edit Employee: <?php echo htmlspecialchars($row['full_name']); ?></h5>
-                <div>
+                    <div>
+                        <a href="employee_record.php?id=<?php echo $id; ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3"><i class="fa fa-address-card"></i> Complete HR Record</a>
                     <a href="employee.php" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="fa fa-arrow-left"></i> Back to Employees</a>
                 </div>
             </div>
             <div class="card-body-custom">
 
-                <form method="POST">
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
 
                     <div class="form-section-title"><i class="fa fa-info-circle"></i> Basic Information</div>
                     <div class="row g-3">
@@ -571,17 +577,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

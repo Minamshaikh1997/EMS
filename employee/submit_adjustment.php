@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 include("../config/db.php");
 
 if (!isset($_SESSION['employee_id'])) {
@@ -24,23 +25,42 @@ $attendance_records = mysqli_query($conn, "
 ");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $attendance_date = mysqli_real_escape_string($conn, $_POST['attendance_date']);
-    $adjustment_type = mysqli_real_escape_string($conn, $_POST['adjustment_type']);
+    ems_verify_csrf();
+    $attendance_date = trim((string)($_POST['attendance_date'] ?? ''));
+    $adjustment_type = trim((string)($_POST['adjustment_type'] ?? ''));
     $requested_check_in = !empty($_POST['requested_check_in']) ? $_POST['requested_check_in'] : null;
     $requested_check_out = !empty($_POST['requested_check_out']) ? $_POST['requested_check_out'] : null;
-    $reason = mysqli_real_escape_string($conn, $_POST['reason']);
+    $reason = trim((string)($_POST['reason'] ?? ''));
     $attendance_id = !empty($_POST['attendance_id']) ? intval($_POST['attendance_id']) : null;
+
+    $allowedAdjustmentTypes = ['Forgot Check In', 'Forgot Check Out', 'Wrong Check In', 'Wrong Check Out', 'Missed Attendance', 'Other'];
+    if (!in_array($adjustment_type, $allowedAdjustmentTypes, true)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $attendance_date)
+        || ($requested_check_in !== null && !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $requested_check_in))
+        || ($requested_check_out !== null && !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $requested_check_out))
+        || trim($reason) === '' || strlen($reason) > 2000) {
+        $error = 'Please provide valid adjustment details.';
+    }
     
     // Handle file upload
     $attachment = '';
     if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
         $target_dir = "../uploads/adjustments/";
         if (!is_dir($target_dir)) {
-            mkdir($target_dir, 0777, true);
+            mkdir($target_dir, 0750, true);
         }
-        $ext = pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
-        $attachment = 'ADJ_' . $employee_id . '_' . time() . '.' . $ext;
-        move_uploaded_file($_FILES['attachment']['tmp_name'], $target_dir . $attachment);
+        $tmpAttachment = $_FILES['attachment']['tmp_name'];
+        $attachmentMime = (new finfo(FILEINFO_MIME_TYPE))->file($tmpAttachment);
+        $allowedAttachments = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'application/pdf' => 'pdf'];
+        if ($_FILES['attachment']['size'] > 5 * 1024 * 1024 || !isset($allowedAttachments[$attachmentMime])) {
+            $error = 'Attachment must be a JPG, PNG or PDF file up to 5 MB.';
+        } else {
+            $attachment = 'ADJ_' . $employee_id . '_' . bin2hex(random_bytes(16)) . '.' . $allowedAttachments[$attachmentMime];
+            if (!move_uploaded_file($tmpAttachment, $target_dir . $attachment)) {
+                $attachment = '';
+                $error = 'Attachment could not be saved.';
+            }
+        }
     }
     
     // Generate request number
@@ -48,20 +68,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $req_count = mysqli_fetch_assoc($req_result)['cnt'] + 1;
     $request_no = 'ADJ-' . date('Ymd') . '-' . str_pad($req_count, 4, '0', STR_PAD_LEFT);
     
-    $query = "INSERT INTO attendance_adjustments 
-              (request_no, employee_id, attendance_id, attendance_date, adjustment_type, 
-               requested_check_in, requested_check_out, reason, attachment, status) 
-              VALUES 
-              ('$request_no', '$employee_id', " . ($attendance_id ? "'$attendance_id'" : "NULL") . ", 
-               '$attendance_date', '$adjustment_type', " . 
-               ($requested_check_in ? "'$requested_check_in'" : "NULL") . ", " . 
-               ($requested_check_out ? "'$requested_check_out'" : "NULL") . ", 
-               '$reason', '$attachment', 'Pending')";
-    
-    if (mysqli_query($conn, $query)) {
+    $status = 'Pending';
+    if ($error !== '') {
+        // Validation message is already set; do not create the request.
+    } else {
+        $stmt = $conn->prepare('INSERT INTO attendance_adjustments (request_no,employee_id,attendance_id,attendance_date,adjustment_type,requested_check_in,requested_check_out,reason,attachment,status) VALUES (?,?,?,?,?,?,?,?,?,?)');
+        $stmt->bind_param('siisssssss', $request_no, $employee_id, $attendance_id, $attendance_date, $adjustment_type, $requested_check_in, $requested_check_out, $reason, $attachment, $status);
+        $saved = $stmt->execute();
+        $stmt->close();
+    if ($saved) {
         $success = "Adjustment request submitted successfully! Request #: $request_no";
     } else {
-        $error = "Error: " . mysqli_error($conn);
+        $error = "Adjustment request could not be submitted.";
+    }
     }
 }
 ?>
@@ -104,7 +123,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="alert alert-danger"><?php echo $error; ?></div>
             <?php endif; ?>
             
-            <form method="POST" enctype="multipart/form-data">
+<form method="POST" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Attendance Date <span class="text-danger">*</span></label>

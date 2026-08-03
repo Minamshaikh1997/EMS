@@ -9,6 +9,10 @@ if (!isset($_SESSION['admin'])) {
 include("../config/db.php");
 include("admincheck_role.php");
 include_once("roles_helper.php");
+include_once("../config/employee_management.php");
+include_once("../config/audit.php");
+
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'], true)) { http_response_code(403); exit('Access denied.'); }
 
 $departments = mysqli_query($conn, "SELECT * FROM departments ORDER BY department_name ASC");
 
@@ -26,49 +30,65 @@ $manageableRoles = getManageableRoles($conn);
 
 if(isset($_POST['save']))
 {
-    $employee_id = !empty($_POST['employee_id']) ? mysqli_real_escape_string($conn, $_POST['employee_id']) : $employeeCode;
-    $full_name = mysqli_real_escape_string($conn, $_POST['full_name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $password_raw = $_POST['password'];
+    ems_verify_csrf();
+    $employee_id = !empty($_POST['employee_id']) ? trim((string)$_POST['employee_id']) : $employeeCode;
+    $full_name = trim((string)($_POST['full_name'] ?? ''));
+    $email = strtolower(trim((string)($_POST['email'] ?? '')));
+    $password_raw = (string)($_POST['password'] ?? '');
     $password = password_hash($password_raw, PASSWORD_DEFAULT);
-    $role = isset($_POST['role']) ? mysqli_real_escape_string($conn, $_POST['role']) : 'Employee';
-    $department = mysqli_real_escape_string($conn, $_POST['department']);
-    $designation = mysqli_real_escape_string($conn, $_POST['designation']);
-    $joining_date = mysqli_real_escape_string($conn, $_POST['joining_date']);
-    $shift_name = !empty($_POST['shift_name']) ? mysqli_real_escape_string($conn, $_POST['shift_name']) : 'Morning';
-    $shift_start_time = !empty($_POST['shift_start_time']) ? mysqli_real_escape_string($conn, $_POST['shift_start_time']) : '09:00';
-    $shift_end_time = !empty($_POST['shift_end_time']) ? mysqli_real_escape_string($conn, $_POST['shift_end_time']) : '17:00';
-    $status = isset($_POST['status']) ? mysqli_real_escape_string($conn, $_POST['status']) : 'Active';
+    $role = trim((string)($_POST['role'] ?? 'Employee'));
+    $department = trim((string)($_POST['department'] ?? ''));
+    $designation = trim((string)($_POST['designation'] ?? ''));
+    $joining_date = trim((string)($_POST['joining_date'] ?? ''));
+    $shift_name = !empty($_POST['shift_name']) ? trim((string)$_POST['shift_name']) : 'Morning';
+    $shift_start_time = !empty($_POST['shift_start_time']) ? trim((string)$_POST['shift_start_time']) : '09:00';
+    $shift_end_time = !empty($_POST['shift_end_time']) ? trim((string)$_POST['shift_end_time']) : '17:00';
+    $status = trim((string)($_POST['status'] ?? 'Active'));
     $reporting_manager_id = isset($_POST['reporting_manager_id']) ? intval($_POST['reporting_manager_id']) : 0;
     $reporting_supervisor_id = isset($_POST['reporting_supervisor_id']) ? intval($_POST['reporting_supervisor_id']) : 0;
     $reporting_team_lead_id = isset($_POST['reporting_team_lead_id']) ? intval($_POST['reporting_team_lead_id']) : 0;
 
-$photo = "";
+    $passwordError = ems_password_validation_error($password_raw);
+    if (!preg_match('/^[A-Za-z0-9_-]{1,20}$/',$employee_id) || $full_name === '' || strlen($full_name)>100 || !filter_var($email,FILTER_VALIDATE_EMAIL)
+        || !in_array($role,$manageableRoles,true) || $department==='' || strlen($department)>100 || $designation==='' || strlen($designation)>100
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/',$joining_date) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_start_time)
+        || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_end_time) || !in_array($status,['Active','Inactive','Suspended','Terminated'],true) || $passwordError) {
+        $error = $passwordError ?: 'Please provide valid employee details.';
+    }
 
-if($_FILES['photo']['name']!="")
-{
-    $photo = time()."_".$_FILES['photo']['name'];
+    $photo = "";
 
-    move_uploaded_file(
-        $_FILES['photo']['tmp_name'],
-        "../uploads/".$photo
-    );
-}
-
-    // Ensure columns exist
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_active TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS status ENUM('Active','Inactive','Suspended','Terminated') DEFAULT 'Active'");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_manager_id INT DEFAULT NULL");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_supervisor_id INT DEFAULT NULL");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS reporting_team_lead_id INT DEFAULT NULL");
+    if (empty($error) && isset($_FILES['photo']) && $_FILES['photo']['error'] !== UPLOAD_ERR_NO_FILE) {
+        if ($_FILES['photo']['error'] !== UPLOAD_ERR_OK || $_FILES['photo']['size'] > 2 * 1024 * 1024) {
+            $error = "Photo upload failed or exceeds the 2 MB limit.";
+        } else {
+            $tmpPhoto = $_FILES['photo']['tmp_name'];
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmpPhoto);
+            $allowedPhotoTypes = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
+            if (!isset($allowedPhotoTypes[$mime]) || @getimagesize($tmpPhoto) === false) {
+                $error = "Only valid JPG and PNG images are allowed.";
+            } else {
+                $photo = "EMP_" . bin2hex(random_bytes(16)) . "." . $allowedPhotoTypes[$mime];
+                if (!move_uploaded_file($tmpPhoto, "../uploads/" . $photo)) {
+                    $photo = "";
+                    $error = "Photo could not be saved.";
+                }
+            }
+        }
+    }
 
     // Check duplicate email
-    $exists = mysqli_query($conn, "SELECT id FROM employees WHERE email='$email' LIMIT 1");
-    if ($exists && mysqli_num_rows($exists) > 0) {
+    $stmt=$conn->prepare('SELECT id FROM employees WHERE email=? LIMIT 1');$stmt->bind_param('s',$email);$stmt->execute();$exists=$stmt->get_result();$stmt->close();
+    if (!empty($error)) {
+        // Keep the form open and show the validation error.
+    } elseif ($exists && mysqli_num_rows($exists) > 0) {
+        if ($photo !== '' && is_file("../uploads/" . $photo)) {
+            unlink("../uploads/" . $photo);
+        }
         $error = "An employee with this email already exists.";
     } else {
         // Ensure unique employee_id
-        $eid_check = mysqli_query($conn, "SELECT id FROM employees WHERE employee_id='$employee_id' LIMIT 1");
+        $stmt=$conn->prepare('SELECT id FROM employees WHERE employee_id=? LIMIT 1');$stmt->bind_param('s',$employee_id);$stmt->execute();$eid_check=$stmt->get_result();$stmt->close();
         if ($eid_check && mysqli_num_rows($eid_check) > 0) {
             $lastEmployee = mysqli_fetch_assoc(mysqli_query($conn, "SELECT id FROM employees ORDER BY id DESC LIMIT 1"));
             $next = $lastEmployee ? $lastEmployee['id'] + 1 : 1;
@@ -78,18 +98,27 @@ if($_FILES['photo']['name']!="")
         // Set is_active based on status
         $is_active = ($status == 'Active') ? 1 : 0;
 
-        $sql = "INSERT INTO employees
-(employee_id, full_name, email, password, role, photo, department, designation, joining_date, shift_name, shift_start_time, shift_end_time, annual_leave, sick_leave, casual_leave, is_active, status, reporting_manager_id, reporting_supervisor_id, reporting_team_lead_id)
-VALUES
-('$employee_id','$full_name','$email','$password','$role','$photo','$department','$designation','$joining_date','$shift_name','$shift_start_time','$shift_end_time',7,10,10,$is_active,'$status','$reporting_manager_id','$reporting_supervisor_id','$reporting_team_lead_id')";
-
-        if(mysqli_query($conn,$sql))
-        {
-            $success = "Employee Added Successfully";
-        }
-        else
-        {
-            $error = "Database Error: " . mysqli_error($conn);
+        $annual=7;$sick=10;$casual=10;
+        mysqli_begin_transaction($conn);
+        try {
+            $stmt=$conn->prepare('INSERT INTO employees (employee_id,full_name,email,password,role,photo,department,designation,joining_date,shift_name,shift_start_time,shift_end_time,annual_leave,sick_leave,casual_leave,is_active,status,reporting_manager_id,reporting_supervisor_id,reporting_team_lead_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $types=str_repeat('s',12).'iiii'.'s'.'iii';
+            $stmt->bind_param($types,$employee_id,$full_name,$email,$password,$role,$photo,$department,$designation,$joining_date,$shift_name,$shift_start_time,$shift_end_time,$annual,$sick,$casual,$is_active,$status,$reporting_manager_id,$reporting_supervisor_id,$reporting_team_lead_id);
+            $stmt->execute();
+            $newEmployeeId = mysqli_insert_id($conn);
+            $stmt->close();
+            if (employeeManagementSchemaReady($conn)) {
+                logEmployeeHistory($conn, $newEmployeeId, 'Created', null, $employee_id, 'Employee created from Add Employee form.');
+            }
+            ems_audit($conn,'employee.created','employee',$newEmployeeId,['employee_code'=>$employee_id,'role'=>$role]);
+            mysqli_commit($conn);
+            header("Location: employee_record.php?id=" . $newEmployeeId . "&created=1");
+            exit();
+        } catch(Throwable $exception) {
+            mysqli_rollback($conn);
+            if ($photo !== '' && is_file('../uploads/'.$photo)) unlink('../uploads/'.$photo);
+            error_log('Employee creation failed: '.$exception->getMessage());
+            $error = "Employee could not be created.";
         }
     }
 }
@@ -149,6 +178,7 @@ $teamLeads = $allEmployees;
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link active"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -174,6 +204,7 @@ $teamLeads = $allEmployees;
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -220,6 +251,7 @@ $teamLeads = $allEmployees;
                 <?php } ?>
 
                 <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
 
                     <div class="form-section-title"><i class="fa fa-info-circle"></i> Basic Information</div>
                     <div class="row g-3">
@@ -237,7 +269,7 @@ $teamLeads = $allEmployees;
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Password <span class="text-danger">*</span></label>
-                            <input type="password" name="password" class="form-control" required>
+                            <input type="password" name="password" class="form-control" minlength="12" autocomplete="new-password" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Department <span class="text-danger">*</span></label>
@@ -394,10 +426,9 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

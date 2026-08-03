@@ -1,5 +1,8 @@
 <?php
 
+require_once(__DIR__ . '/../config/security.php');
+ems_start_secure_session();
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -12,6 +15,8 @@ if (!isset($_SESSION['admin'])) {
 
 // Current Admin Role
 $admin_role = $_SESSION['admin_role'] ?? '';
+$admin_role = ems_canonical_admin_role((string)$admin_role);
+$_SESSION['admin_role'] = $admin_role;
 
 $admin_name = $_SESSION['admin_name'] ?? '';
 
@@ -32,7 +37,8 @@ if (($admin_name == '' || $admin_role == '') && isset($conn)) {
             $_SESSION['admin_name'] = $admin_name;
         }
         if (empty($admin_role)) {
-            $admin_role = $adminRow['role'] ?? 'Admin';
+            $_SESSION['admin_role_original'] = $adminRow['role'] ?? 'Admin';
+            $admin_role = ems_canonical_admin_role($_SESSION['admin_role_original']);
             $_SESSION['admin_role'] = $admin_role;
         }
     }

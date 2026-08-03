@@ -30,9 +30,18 @@ function hasEmployeeRight($conn, $employee_id, $feature) {
         return false;
     }
 
+    $allowed_features = [
+        'can_view_payroll', 'can_apply_leave', 'can_view_attendance',
+        'can_submit_adjustment', 'can_edit_profile', 'can_view_reports',
+        'can_change_password'
+    ];
+    if (!in_array($feature, $allowed_features, true)) {
+        return false;
+    }
+
     // Check if feature is enabled for this employee
     $stmt = $conn->prepare("
-        SELECT is_enabled FROM employees 
+        SELECT $feature FROM employees 
         WHERE id = ? AND $feature = 1
         LIMIT 1
     ");

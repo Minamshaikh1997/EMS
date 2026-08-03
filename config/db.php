@@ -1,38 +1,57 @@
 <?php
 
+require_once __DIR__ . '/security.php';
+require_once __DIR__ . '/ui_enhancements.php';
+if (PHP_SAPI !== 'cli') {
+    ems_start_secure_session();
+    ems_enable_ui_enhancements();
+}
+
 // Set timezone to Pakistan Standard Time
 date_default_timezone_set('Asia/Karachi');
 
-// Determine environment - check if running on localhost
-$is_localhost = false;
-if (isset($_SERVER['HTTP_HOST'])) {
-    $is_localhost = (
-        $_SERVER['HTTP_HOST'] == 'localhost' ||
-        $_SERVER['HTTP_HOST'] == '127.0.0.1' ||
-        $_SERVER['HTTP_HOST'] == '::1'
-    );
+$appEnvironment = strtolower(trim((string)(getenv('EMS_APP_ENV') ?: '')));
+$requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+$requestHost = preg_replace('/:\d+$/', '', $requestHost);
+$isLocalHost = in_array($requestHost, ['localhost', '127.0.0.1', '::1', '[::1]'], true);
+$serverAddress = (string)($_SERVER['SERVER_ADDR'] ?? '');
+$isLoopbackServer = in_array($serverAddress, ['127.0.0.1', '::1'], true);
+$isProduction = $appEnvironment === 'production';
+$useLocalDatabase = !$isProduction && (PHP_SAPI === 'cli' || ($isLocalHost && $isLoopbackServer));
+
+if ($isProduction) {
+    ini_set('display_errors', '0');
+    ini_set('log_errors', '1');
+} elseif ($appEnvironment === 'development') {
+    ini_set('display_errors', '1');
+    error_reporting(E_ALL);
 }
 
-// Also check if we're running from CLI or if localhost connection works
-if ($is_localhost || !isset($_SERVER['HTTP_HOST'])) {
+if ($useLocalDatabase) {
     // Try localhost first
     $host = "localhost";
     $user = "root";
     $password = "";  // XAMPP default: no password for root user
     $database = "employee_leave_system";
 } else {
-    // InfinityFree
-    $host = "sql202.infinityfree.com";
-    $user = "YOUR_MYSQL_USERNAME";   // Panel se copy karein
-    $password = "Roman1250";
-    $database = "if0_42402211_EMS";
+    $host = getenv('EMS_DB_HOST') ?: '';
+    $user = getenv('EMS_DB_USER') ?: '';
+    $password = getenv('EMS_DB_PASSWORD') ?: '';
+    $database = getenv('EMS_DB_NAME') ?: '';
+
+    if ($host === '' || $user === '' || $database === '') {
+        http_response_code(500);
+        exit('Database configuration is missing.');
+    }
 }
 
 // Create connection with improved settings to prevent "MySQL server has gone away"
 $conn = mysqli_connect($host, $user, $password, $database);
 
 if (!$conn) {
-    die("Database Connection Failed: " . mysqli_connect_error());
+    error_log('EMS database connection failed: ' . mysqli_connect_error());
+    http_response_code(500);
+    exit('Database connection is temporarily unavailable.');
 }
 
 // Set MySQL connection options to prevent timeout issues
@@ -46,4 +65,7 @@ mysqli_query($conn, "SET SESSION net_write_timeout = 120");
 
 // Enable MySQLi exceptions for better error handling
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+require_once __DIR__ . '/page_permissions.php';
+ems_enforce_admin_page_permission($conn);
 ?>

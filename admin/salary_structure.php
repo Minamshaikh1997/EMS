@@ -3,18 +3,21 @@ session_start();
 
 include("admincheck_role.php");
 include("../config/db.php");
+include_once("../config/audit.php");
 
 if (!isset($_SESSION['admin'])) {
     header("Location: ../index.html");
     exit();
 }
 
-// Delete Salary Structure
-if (isset($_GET['delete'])) {
-    $id = intval($_GET['delete']);
+if (!in_array($admin_role, ['Super Admin','Admin','Finance Manager'], true)) { http_response_code(403); exit('Access denied.'); }
 
-    mysqli_query($conn, "DELETE FROM salary_structure_components WHERE salary_structure_id='$id'");
-    mysqli_query($conn, "DELETE FROM salary_structure WHERE id='$id'");
+// Delete Salary Structure
+if (isset($_POST['delete'])) {
+    ems_verify_csrf();
+    $id = intval($_POST['delete']);
+    mysqli_begin_transaction($conn);
+    try { $stmt=$conn->prepare('DELETE FROM salary_structure_components WHERE salary_structure_id=?');$stmt->bind_param('i',$id);$stmt->execute();$stmt->close();$stmt=$conn->prepare('DELETE FROM salary_structure WHERE id=?');$stmt->bind_param('i',$id);$stmt->execute();$stmt->close();ems_audit($conn,'salary_structure.deleted','salary_structure',$id);mysqli_commit($conn); } catch(Throwable $e){mysqli_rollback($conn);throw $e;}
 
     header("Location: salary_structure.php");
     exit();
@@ -22,9 +25,14 @@ if (isset($_GET['delete'])) {
 
 // Save Salary Structure
 if (isset($_POST['save'])) {
+    ems_verify_csrf();
     $employee_id = intval($_POST['employee_id']);
     $basic_salary = floatval($_POST['basic_salary']);
     $component_amounts = $_POST['component_amount'] ?? [];
+    if ($employee_id < 1 || $basic_salary < 0 || !is_array($component_amounts)) { http_response_code(422); exit('Invalid salary details.'); }
+
+    mysqli_begin_transaction($conn);
+    try {
 
     $check = mysqli_query($conn, "SELECT id FROM salary_structure WHERE employee_id='$employee_id'");
 
@@ -32,28 +40,12 @@ if (isset($_POST['save'])) {
         $salaryRow = mysqli_fetch_assoc($check);
         $salary_structure_id = $salaryRow['id'];
 
-        mysqli_query($conn, "
-            UPDATE salary_structure SET
-            basic_salary='$basic_salary',
-            house_allowance='0',
-            medical_allowance='0',
-            transport_allowance='0',
-            other_allowance='0',
-            tax_deduction='0',
-            other_deduction='0'
-            WHERE id='$salary_structure_id'
-        ");
-
-        mysqli_query($conn, "DELETE FROM salary_structure_components WHERE salary_structure_id='$salary_structure_id'");
+        $stmt=$conn->prepare('UPDATE salary_structure SET basic_salary=?,house_allowance=0,medical_allowance=0,transport_allowance=0,other_allowance=0,tax_deduction=0,other_deduction=0 WHERE id=?');$stmt->bind_param('di',$basic_salary,$salary_structure_id);$stmt->execute();$stmt->close();
+        $stmt=$conn->prepare('DELETE FROM salary_structure_components WHERE salary_structure_id=?');$stmt->bind_param('i',$salary_structure_id);$stmt->execute();$stmt->close();
 
         $message = "<div class='alert alert-success'>Salary Updated Successfully.</div>";
     } else {
-        mysqli_query($conn, "
-            INSERT INTO salary_structure
-            (employee_id, basic_salary, house_allowance, medical_allowance, transport_allowance, other_allowance, tax_deduction, other_deduction)
-            VALUES
-            ('$employee_id', '$basic_salary', '0', '0', '0', '0', '0', '0')
-        ");
+        $stmt=$conn->prepare('INSERT INTO salary_structure (employee_id,basic_salary,house_allowance,medical_allowance,transport_allowance,other_allowance,tax_deduction,other_deduction) VALUES (?,?,0,0,0,0,0,0)');$stmt->bind_param('id',$employee_id,$basic_salary);$stmt->execute();$stmt->close();
 
         $salary_structure_id = mysqli_insert_id($conn);
 
@@ -65,14 +57,12 @@ if (isset($_POST['save'])) {
         $amount = floatval($amount);
 
         if ($amount > 0) {
-            mysqli_query($conn, "
-                INSERT INTO salary_structure_components
-                (salary_structure_id, component_id, amount)
-                VALUES
-                ('$salary_structure_id', '$component_id', '$amount')
-            ");
+            $stmt=$conn->prepare('INSERT INTO salary_structure_components (salary_structure_id,component_id,amount) VALUES (?,?,?)');$stmt->bind_param('iid',$salary_structure_id,$component_id,$amount);$stmt->execute();$stmt->close();
         }
     }
+    ems_audit($conn,'salary_structure.saved','salary_structure',(int)$salary_structure_id,['employee_id'=>$employee_id,'basic_salary'=>$basic_salary]);
+    mysqli_commit($conn);
+    } catch(Throwable $error) { mysqli_rollback($conn); error_log('Salary structure save failed: '.$error->getMessage()); $message="<div class='alert alert-danger'>Salary structure could not be saved.</div>"; }
 }
 
 // Employee List
@@ -162,8 +152,12 @@ $salaryList = mysqli_query($conn, "
         <div class="sidebar-section-group">
             <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
             <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
-            <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
-            <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
+        <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
+        <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
+        <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
+        <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
+        <a href="manage_shifts.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Manage Shifts</a>
             <a href="attendance_report.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
             <a href="reports.php" class="sidebar-link"><i class="fa fa-chart-column"></i> Reports</a>
         </div>
@@ -184,7 +178,8 @@ $salaryList = mysqli_query($conn, "
         <div class="sidebar-section-group">
             <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
             <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
-            <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
             <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
             <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -219,7 +214,8 @@ $salaryList = mysqli_query($conn, "
 
         <?php if (isset($message)) { echo $message; } ?>
 
-        <form method="POST">
+<form method="POST">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
 
             <div class="card shadow mb-4">
                 <div class="card-header bg-success text-white">
@@ -343,12 +339,7 @@ $salaryList = mysqli_query($conn, "
                                     <td class="text-success fw-bold"><?php echo number_format($gross, 2); ?></td>
                                     <td class="text-primary fw-bold"><?php echo number_format($net, 2); ?></td>
                                     <td>
-                                        <a
-                                            href="salary_structure.php?delete=<?php echo $row['id']; ?>"
-                                            class="btn btn-danger btn-sm"
-                                            onclick="return confirm('Are you sure you want to delete this salary structure?');">
-                                            <i class="fa fa-trash"></i>
-                                        </a>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary structure?');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(ems_csrf_token())?>"><button name="delete" value="<?=(int)$row['id']?>" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></form>
                                     </td>
                                 </tr>
                             <?php } ?>
@@ -402,16 +393,15 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
 
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');
@@ -421,5 +411,6 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
 });
 </script>
 
+<?php include __DIR__ . '/../config/back_dashboard.php'; ?>
 </body>
 </html>

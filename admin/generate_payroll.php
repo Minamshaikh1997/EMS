@@ -3,6 +3,7 @@ session_start();
 
 include("admincheck_role.php");
 include("../config/db.php");
+include_once("../config/audit.php");
 
 if (!isset($_SESSION['admin'])) {
     header("Location: ../index.html");
@@ -11,7 +12,13 @@ if (!isset($_SESSION['admin'])) {
 
 $message = "";
 
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Finance Manager', 'Accountant'], true)) {
+    http_response_code(403);
+    exit('You do not have permission to generate payroll.');
+}
+
 if (isset($_POST['generate'])) {
+    ems_verify_csrf();
     $employee_id = intval($_POST['employee_id']);
     $month = mysqli_real_escape_string($conn, $_POST['month']);
     $year = intval($_POST['year']);
@@ -66,38 +73,27 @@ if (isset($_POST['generate'])) {
             $tax = 0;
             $net_salary = ($basic_salary + $allowances + $overtime + $bonus) - ($deductions + $tax);
 
-            mysqli_query($conn, "
-                INSERT INTO payroll
-                (
-                    employee_id,
-                    payroll_month,
-                    payroll_year,
-                    basic_salary,
-                    allowances,
-                    overtime,
-                    bonus,
-                    deductions,
-                    tax,
-                    net_salary,
-                    payment_status
-                )
-                VALUES
-                (
-                    '$employee_id',
-                    '$month',
-                    '$year',
-                    '$basic_salary',
-                    '$allowances',
-                    '$overtime',
-                    '$bonus',
-                    '$deductions',
-                    '$tax',
-                    '$net_salary',
-                    'Pending'
-                )
-            ");
-
-            $message = "<div class='alert alert-success alert-dismissible fade show rounded-pill px-4'><i class='fa fa-check-circle me-2'></i> Payroll Generated Successfully.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+            try {
+                mysqli_begin_transaction($conn);
+                $paymentStatus = 'Pending';
+                $stmt = $conn->prepare('INSERT INTO payroll (employee_id,payroll_month,payroll_year,basic_salary,allowances,overtime,bonus,deductions,tax,net_salary,payment_status) VALUES (?,?,?,?,?,?,?,?,?,?,?)');
+                $stmt->bind_param('isiddddddds', $employee_id, $month, $year, $basic_salary, $allowances, $overtime, $bonus, $deductions, $tax, $net_salary, $paymentStatus);
+                $stmt->execute();
+                $payrollId = (int)$conn->insert_id;
+                $stmt->close();
+                ems_audit($conn, 'payroll.generated', 'payroll', $payrollId, [
+                    'employee_id' => $employee_id,
+                    'month' => $month,
+                    'year' => $year,
+                    'net_salary' => (float)$net_salary,
+                ]);
+                mysqli_commit($conn);
+                $message = "<div class='alert alert-success alert-dismissible fade show rounded-pill px-4'><i class='fa fa-check-circle me-2'></i> Payroll Generated Successfully.<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+            } catch (Throwable $error) {
+                mysqli_rollback($conn);
+                error_log('Payroll generation failed: ' . $error->getMessage());
+                $message = "<div class='alert alert-danger'>Payroll could not be generated.</div>";
+            }
         }
     }
 }
@@ -174,6 +170,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -199,6 +196,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -226,7 +224,8 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
             </div>
             <div class="card-body-custom">
                 <?php echo $message; ?>
-                <form method="POST">
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label">Employee</label>
@@ -297,17 +296,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

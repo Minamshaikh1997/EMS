@@ -10,16 +10,29 @@ if (!isset($_SESSION['employee_id'])) {
 }
 
 include("../config/db.php");
+include("../config/attendance.php");
 
-$employee_id = $_SESSION['employee_id'];
+$employee_id = (int)$_SESSION['employee_id'];
 $today = date("Y-m-d");
 $currentTime = date("H:i:s");
+$now = new DateTime();
+$policy = attendancePolicy($conn);
+$employeeShift = mysqli_fetch_assoc(mysqli_query($conn, "SELECT shift_name, shift_start_time, shift_end_time FROM employees WHERE id='$employee_id'"));
+$shiftStartRaw = $employeeShift['shift_start_time'] ?: '09:00:00';
+$shiftEndRaw = $employeeShift['shift_end_time'] ?: '17:00:00';
+[$shiftStartAt, $shiftEndAt] = shiftWindow($today, $shiftStartRaw, $shiftEndRaw);
+// After midnight, an open overnight shift belongs to the previous attendance date.
+if ($shiftEndAt->format('Y-m-d') !== $today && $now < $shiftEndAt && $now->format('H:i:s') < $shiftEndRaw) {
+    $attendanceDate = (clone $now)->modify('-1 day')->format('Y-m-d');
+    [$shiftStartAt, $shiftEndAt] = shiftWindow($attendanceDate, $shiftStartRaw, $shiftEndRaw);
+} else { $attendanceDate = $today; }
+$periodLocked = attendancePeriodLocked($conn, $attendanceDate);
 
 // Today's Attendance
 $check = mysqli_query($conn, "
 SELECT * FROM attendance
 WHERE employee_id='$employee_id'
-AND attendance_date='$today'
+AND attendance_date='$attendanceDate'
 ");
 
 $row = mysqli_fetch_assoc($check);
@@ -29,36 +42,24 @@ $row = mysqli_fetch_assoc($check);
 // =======================
 if(isset($_POST['check_in']))
 {
+    if (!verifyAttendanceCsrf()) { http_response_code(419); exit('Invalid security token.'); }
+    if ($periodLocked) { header('Location: attendance.php?error=period_locked'); exit(); }
     $already = mysqli_query($conn,"
     SELECT * FROM attendance
     WHERE employee_id='$employee_id'
-    AND attendance_date='$today'
+    AND attendance_date='$attendanceDate'
     ");
 
     if(mysqli_num_rows($already)==0)
     {
-        // Get employee's shift start time
-        $employeeShift = mysqli_fetch_assoc(mysqli_query($conn,"
-        SELECT shift_start_time FROM employees
-        WHERE id='$employee_id'
-        "));
-
-        $initialStatus = 'Present';
-
-        // Check if employee is late
-        if($employeeShift && !empty($employeeShift['shift_start_time']))
-        {
-            $shiftStart = date('H:i:s', strtotime($employeeShift['shift_start_time']));
-            if($currentTime > $shiftStart)
-            {
-                $initialStatus = 'Late';
-            }
-        }
+        $lateMinutes = max(0, (int)floor(($now->getTimestamp() - $shiftStartAt->getTimestamp()) / 60) - (int)$policy['grace_minutes']);
+        $initialStatus = $lateMinutes > 0 ? 'Late' : 'Present';
+        $checkInAt = $now->format('Y-m-d H:i:s');
 
         mysqli_query($conn,"
         INSERT INTO attendance
-        (employee_id, attendance_date, check_in, status)
-        VALUES ('$employee_id', '$today', '$currentTime', '$initialStatus')
+        (employee_id, attendance_date, check_in, check_in_at, late_minutes, status, source)
+        VALUES ('$employee_id', '$attendanceDate', '$currentTime', '$checkInAt', '$lateMinutes', '$initialStatus', 'Web')
         ");
     }
 
@@ -71,46 +72,27 @@ if(isset($_POST['check_in']))
 // =======================
 if(isset($_POST['check_out']))
 {
+    if (!verifyAttendanceCsrf()) { http_response_code(419); exit('Invalid security token.'); }
+    if ($periodLocked) { header('Location: attendance.php?error=period_locked'); exit(); }
     $attendance = mysqli_fetch_assoc(mysqli_query($conn,"
     SELECT * FROM attendance
     WHERE employee_id='$employee_id'
-    AND attendance_date='$today'
+    AND attendance_date='$attendanceDate'
     "));
 
     if($attendance)
     {
-        $checkIn = strtotime($attendance['check_in']);
-        $checkOut = strtotime($currentTime);
-        $seconds = $checkOut - $checkIn;
-        if($seconds < 0) { $seconds = 0; }
-
-        $hours = floor($seconds / 3600);
-        $minutes = floor(($seconds % 3600) / 60);
+        if (!empty($attendance['is_locked'])) { header('Location: attendance.php?error=locked'); exit(); }
+        $checkInAt = !empty($attendance['check_in_at']) ? new DateTime($attendance['check_in_at']) : new DateTime($attendanceDate.' '.$attendance['check_in']);
+        $metrics = attendanceMetrics($checkInAt, $now, $shiftStartAt, $shiftEndAt, $policy);
+        $hours = intdiv($metrics['worked'], 60); $minutes = $metrics['worked'] % 60;
         $workingHours = $hours." Hours ".$minutes." Minutes";
-        $status = $attendance['status'];
-
-        // Get employee's shift end time to check for early out
-        $employeeShift = mysqli_fetch_assoc(mysqli_query($conn,"
-        SELECT shift_end_time FROM employees
-        WHERE id='$employee_id'
-        "));
-
-        $isEarlyOut = false;
-        if($employeeShift && !empty($employeeShift['shift_end_time']))
-        {
-            $shiftEnd = date('H:i:s', strtotime($employeeShift['shift_end_time']));
-            if($currentTime < $shiftEnd) { $isEarlyOut = true; }
-        }
-
-        if($isEarlyOut) { $status = "Early Out"; }
-        elseif($hours >= 8) { $status = "Present"; }
-        elseif($hours >= 4) { $status = "Half Day"; }
-        else { $status = "Absent"; }
+        $checkOutAt=$now->format('Y-m-d H:i:s');
 
         mysqli_query($conn,"
         UPDATE attendance
-        SET check_out='$currentTime', working_hours='$workingHours', status='$status'
-        WHERE employee_id='$employee_id' AND attendance_date='$today'
+        SET check_out='$currentTime', check_out_at='$checkOutAt', working_hours='$workingHours', work_minutes='{$metrics['worked']}', late_minutes='{$metrics['late']}', early_out_minutes='{$metrics['early']}', overtime_minutes='{$metrics['overtime']}', status='{$metrics['status']}'
+        WHERE employee_id='$employee_id' AND attendance_date='$attendanceDate' AND is_locked=0
         ");
     }
 
@@ -122,7 +104,7 @@ if(isset($_POST['check_out']))
 $check = mysqli_query($conn,"
 SELECT * FROM attendance
 WHERE employee_id='$employee_id'
-AND attendance_date='$today'
+AND attendance_date='$attendanceDate'
 ");
 $row = mysqli_fetch_assoc($check);
 
@@ -135,13 +117,10 @@ ORDER BY attendance_date DESC
 LIMIT 7
 ");
 
-// Get employee shift info
-$employeeShift = mysqli_fetch_assoc(mysqli_query($conn, "
-SELECT shift_name, shift_start_time, shift_end_time FROM employees WHERE id='$employee_id'
-"));
 $shiftName = $employeeShift['shift_name'] ?? 'Morning';
 $shiftStartTime = !empty($employeeShift['shift_start_time']) ? date('h:i A', strtotime($employeeShift['shift_start_time'])) : '09:00 AM';
 $shiftEndTime = !empty($employeeShift['shift_end_time']) ? date('h:i A', strtotime($employeeShift['shift_end_time'])) : '05:00 PM';
+$attendanceCsrf = attendanceCsrfToken();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -659,6 +638,7 @@ body.dark-mode {
                 </div>
                 <div class="action-group">
                     <form method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($attendanceCsrf); ?>">
                         <button type="submit" name="check_in" class="btn-large btn-check-in">
                             <i class="fa-solid fa-right-to-bracket"></i> Check In
                         </button>
@@ -691,6 +671,7 @@ body.dark-mode {
                 </div>
                 <div class="action-group">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($attendanceCsrf); ?>">
                         <button type="submit" name="check_out" class="btn-large btn-check-out">
                             <i class="fa-solid fa-right-from-bracket"></i> Check Out
                         </button>

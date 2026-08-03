@@ -1,6 +1,6 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 
 session_start();
 
@@ -10,7 +10,13 @@ if (!isset($_SESSION['admin'])) {
 }
 
 include("../config/db.php");
+include_once("../config/audit.php");
 include("admincheck_role.php");
+
+if (!in_array($admin_role, ['Super Admin', 'Admin', 'Operations Manager'], true)) {
+    http_response_code(403);
+    exit('You do not have permission to send system email.');
+}
 
 $message = '';
 $messageType = '';
@@ -29,36 +35,53 @@ while ($row = mysqli_fetch_assoc($employeesQuery)) {
     $employees[] = $row;
 }
 
+$allowedEmails = [];
+foreach (array_merge($admins, $employees) as $recipient) {
+    $normalized = strtolower(trim((string)$recipient['email']));
+    if (filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+        $allowedEmails[$normalized] = true;
+    }
+}
+
 // Handle email sending
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $recipientType = $_POST['recipient_type'] ?? '';
-    $selectedEmails = $_POST['emails'] ?? [];
-    $subject = trim($_POST['subject'] ?? '');
-    $messageBody = trim($_POST['message'] ?? '');
+    ems_verify_csrf();
+    $selectedEmails = is_array($_POST['emails'] ?? null) ? $_POST['emails'] : [];
+    $selectedEmails = array_values(array_unique(array_map(static fn($email) => strtolower(trim((string)$email)), $selectedEmails)));
+    $selectedEmails = array_values(array_filter($selectedEmails, static fn($email) => isset($allowedEmails[$email])));
+    $subject = trim((string)($_POST['subject'] ?? ''));
+    $messageBody = trim((string)($_POST['message'] ?? ''));
     
     if (empty($selectedEmails)) {
         $message = 'Please select at least one recipient.';
         $messageType = 'danger';
-    } elseif (empty($subject)) {
-        $message = 'Please enter a subject.';
+    } elseif (count($selectedEmails) > 100) {
+        $message = 'A maximum of 100 recipients is allowed per send.';
         $messageType = 'danger';
-    } elseif (empty($messageBody)) {
-        $message = 'Please enter a message.';
+    } elseif ($subject === '' || strlen($subject) > 200 || preg_match('/[\r\n]/', $subject)) {
+        $message = 'Please enter a valid subject up to 200 characters.';
+        $messageType = 'danger';
+    } elseif ($messageBody === '' || strlen($messageBody) > 10000) {
+        $message = 'Please enter a message up to 10,000 characters.';
         $messageType = 'danger';
     } else {
         // Send emails
-        $headers = "From: EMS System <noreply@ems.com>\r\n";
-        $headers .= "Reply-To: noreply@ems.com\r\n";
+        $fromAddress = getenv('EMS_MAIL_FROM') ?: 'noreply@example.invalid';
+        if (!filter_var($fromAddress, FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/', $fromAddress)) {
+            $fromAddress = 'noreply@example.invalid';
+        }
+        $headers = "From: EMS System <{$fromAddress}>\r\n";
+        $headers .= "Reply-To: {$fromAddress}\r\n";
         $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $safeBody = nl2br(htmlspecialchars($messageBody, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
         
         $sentCount = 0;
         $failedCount = 0;
         $failedEmails = [];
         
         foreach ($selectedEmails as $email) {
-            $email = trim($email);
-            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $mailSent = mail($email, $subject, nl2br($messageBody), $headers);
+            if (isset($allowedEmails[$email])) {
+                $mailSent = mail($email, $subject, $safeBody, $headers);
                 if ($mailSent) {
                     $sentCount++;
                 } else {
@@ -74,12 +97,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             // Clear form
             $_POST = [];
         } elseif ($sentCount > 0 && $failedCount > 0) {
-            $message = "Sent to $sentCount recipient(s). Failed for: " . implode(', ', $failedEmails);
+            $message = "Sent to $sentCount recipient(s); $failedCount delivery attempt(s) failed.";
             $messageType = 'warning';
         } else {
             $message = "Failed to send emails. Please check your server mail configuration.";
             $messageType = 'danger';
         }
+
+        ems_audit($conn, 'email.bulk_send', 'email_batch', null, [
+            'requested' => count($selectedEmails),
+            'sent' => $sentCount,
+            'failed' => $failedCount,
+            'subject_length' => strlen($subject),
+        ]);
     }
 }
 ?>
@@ -154,6 +184,7 @@ textarea.form-control { min-height: 150px; resize: vertical; }
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -179,6 +210,7 @@ textarea.form-control { min-height: 150px; resize: vertical; }
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link active"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -213,7 +245,8 @@ textarea.form-control { min-height: 150px; resize: vertical; }
                 <h5 class="mb-0"><i class="fa fa-envelope me-2" style="color: var(--primary);"></i> Compose Email</h5>
             </div>
             <div class="compose-body">
-                <form method="POST" action="">
+<form method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                     <!-- Recipient Type Selection -->
                     <div class="mb-3">
                         <label class="form-label">Select Recipients</label>
@@ -313,13 +346,13 @@ textarea.form-control { min-height: 150px; resize: vertical; }
                     <!-- Subject -->
                     <div class="mb-3">
                         <label for="subject" class="form-label">Subject <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="subject" name="subject" placeholder="Enter email subject" required value="<?php echo htmlspecialchars($_POST['subject'] ?? ''); ?>">
+                        <input type="text" class="form-control" id="subject" name="subject" maxlength="200" placeholder="Enter email subject" required value="<?php echo htmlspecialchars($_POST['subject'] ?? ''); ?>">
                     </div>
 
                     <!-- Message -->
                     <div class="mb-3">
                         <label for="message" class="form-label">Message <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="message" name="message" placeholder="Type your message here..." required><?php echo htmlspecialchars($_POST['message'] ?? ''); ?></textarea>
+                        <textarea class="form-control" id="message" name="message" maxlength="10000" placeholder="Type your message here..." required><?php echo htmlspecialchars($_POST['message'] ?? ''); ?></textarea>
                     </div>
 
                     <!-- Buttons -->
@@ -418,17 +451,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

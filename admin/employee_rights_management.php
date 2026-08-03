@@ -14,6 +14,7 @@ $error = '';
 
 // Handle bulk update
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['bulk_update_rights'])) {
+    ems_verify_csrf();
     $employee_id = intval($_POST['employee_id']);
     $rights = [
         'can_view_payroll' => isset($_POST['rights']['can_view_payroll']) ? 1 : 0,
@@ -26,14 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['bulk_update_rights']))
     ];
 
     // Ensure columns exist
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_payroll TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_apply_leave TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_attendance TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_submit_adjustment TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_edit_profile TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_view_reports TINYINT(1) DEFAULT 1");
-    mysqli_query($conn, "ALTER TABLE employees ADD COLUMN IF NOT EXISTS can_change_password TINYINT(1) DEFAULT 1");
-
     $sql = "UPDATE employees SET 
             can_view_payroll = '{$rights['can_view_payroll']}',
             can_apply_leave = '{$rights['can_apply_leave']}',
@@ -410,6 +403,12 @@ body {
         <a href="dashboard.php" class="sidebar-link"><i class="fa fa-gauge"></i> Dashboard</a>
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
+        <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
+        <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
+        <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
+        <a href="manage_shifts.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Manage Shifts</a>
+        <a href="attendance_report.php" class="sidebar-link"><i class="fa fa-clock"></i> Attendance</a>
+        <a href="reports.php" class="sidebar-link"><i class="fa fa-chart-column"></i> Reports</a>
         </div>
 
         <div class="sidebar-section-title">Rights Management</div>
@@ -422,12 +421,19 @@ body {
         <a href="payroll_dashboard.php" class="sidebar-link"><i class="fa-solid fa-money-bill-wave"></i> Payroll Dashboard</a>
         <a href="generate_payroll.php" class="sidebar-link"><i class="fa fa-file-invoice-dollar"></i> Generate Payroll</a>
         <a href="payroll_history.php" class="sidebar-link"><i class="fa fa-clock-rotate-left"></i> Payroll History</a>
+        <a href="salary_components.php" class="sidebar-link"><i class="fa fa-wallet"></i> Salary Components</a>
+        <a href="salary_slips.php" class="sidebar-link"><i class="fa fa-file-pdf"></i> Salary Slips</a>
+        <a href="payroll_reports.php" class="sidebar-link"><i class="fa fa-chart-line"></i> Payroll Reports</a>
+        <a href="salary_structure.php" class="sidebar-link"><i class="fa fa-money-bill-wave"></i> Salary Structure</a>
+        <a href="monthly_payroll.php" class="sidebar-link"><i class="fa fa-calendar"></i> Monthly Payroll</a>
         </div>
 
         <div class="sidebar-section-title">System</div>
         <div class="sidebar-section-group">
         <a href="add_notice.php" class="sidebar-link"><i class="fa fa-bullhorn"></i> Notices</a>
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
+        <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
+        <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>
@@ -625,7 +631,8 @@ body {
                                         </div>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                     </div>
-                                    <form method="POST">
+<form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                                         <div class="modal-body">
                                             <input type="hidden" name="employee_id" value="<?php echo $emp['id']; ?>">
                                             <input type="hidden" name="bulk_update_rights" value="1">
@@ -766,17 +773,16 @@ document.querySelectorAll('.sidebar-nav > .sidebar-section-title').forEach(funct
     // Toggle on click
     title.addEventListener('click', function(e) {
         if (e.target.tagName === 'A') return;
-        const group = this.querySelector('+ .sidebar-section-group') || this.nextElementSibling;
+        const group = this.nextElementSibling;
         if (!group || !group.classList.contains('sidebar-section-group')) return;
 
         const isCollapsed = group.classList.toggle('collapsed');
         const ico = this.querySelector('.section-collapse-icon');
         if (ico) ico.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebar_' + sectionName, isCollapsed ? 'collapsed' : 'expanded');
     });
 
     // Restore state
-    const saved = localStorage.getItem('sidebar_' + sectionName);
+    const saved = null;
     const group = title.nextElementSibling;
     if (saved === 'collapsed' && group && group.classList.contains('sidebar-section-group')) {
         group.classList.add('collapsed');

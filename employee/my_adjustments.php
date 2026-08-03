@@ -1,6 +1,8 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 include("../config/db.php");
+require_once("../config/audit.php");
 
 if (!isset($_SESSION['employee_id'])) {
     header("Location: ../index.php");
@@ -12,16 +14,17 @@ $employee_name = $_SESSION['employee_name'] ?? '';
 $employee_role = $_SESSION['employee_role'] ?? 'Employee';
 
 // Handle Cancel Request
-if (isset($_GET['cancel']) && isset($_GET['id'])) {
-    $adj_id = intval($_GET['id']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel'], $_POST['id'])) {
+    ems_verify_csrf();
+    $adj_id = intval($_POST['id']);
     // Only allow cancel if status is Pending
-    $check = mysqli_query($conn, "SELECT * FROM attendance_adjustments WHERE id='$adj_id' AND employee_id='$employee_id' AND status='Pending'");
-    if (mysqli_num_rows($check) > 0) {
-        mysqli_query($conn, "UPDATE attendance_adjustments SET status='Cancelled' WHERE id='$adj_id'");
-        // Audit log
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-        mysqli_query($conn, "INSERT INTO audit_log (action_type, description, performed_by, performed_by_role, target_id, target_type, ip_address) 
-            VALUES ('Cancel Adjustment', 'Employee cancelled adjustment request #$adj_id', '$employee_name', 'Employee', '$adj_id', 'attendance_adjustments', '$ip')");
+    $stmt = $conn->prepare("UPDATE attendance_adjustments SET status='Cancelled' WHERE id=? AND employee_id=? AND status='Pending'");
+    $stmt->bind_param('ii', $adj_id, $employee_id);
+    $stmt->execute();
+    $cancelled = $stmt->affected_rows === 1;
+    $stmt->close();
+    if ($cancelled) {
+        ems_audit($conn, 'adjustment.cancel', 'attendance_adjustments', $adj_id, ['employee_id' => $employee_id]);
         $success = "Request cancelled successfully.";
     } else {
         $error = "Cannot cancel this request. It may already be processed.";
@@ -29,14 +32,17 @@ if (isset($_GET['cancel']) && isset($_GET['id'])) {
 }
 
 // Fetch all adjustments for this employee
-$adjustments = mysqli_query($conn, "
+$stmt = $conn->prepare("
     SELECT a.*, 
            COALESCE(a.supervisor_comment, '') AS supervisor_comment,
            COALESCE(a.admin_comment, '') AS admin_comment
     FROM attendance_adjustments a 
-    WHERE a.employee_id='$employee_id' 
+    WHERE a.employee_id=? 
     ORDER BY a.id DESC
 ");
+$stmt->bind_param('i', $employee_id);
+$stmt->execute();
+$adjustments = $stmt->get_result();
 ?>
 <!DOCTYPE html>
 <html>
@@ -156,9 +162,12 @@ $adjustments = mysqli_query($conn, "
                                     <td><span class="badge <?php echo $statusClass; ?>"><?php echo $row['status']; ?></span></td>
                                     <td>
                                         <?php if ($row['status'] === 'Pending'): ?>
-                                            <a href="?cancel=1&id=<?php echo $row['id']; ?>" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to cancel this request?')">
-                                                <i class="fas fa-times"></i> Cancel
-                                            </a>
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to cancel this request?')">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(ems_csrf_token()); ?>">
+                                                <input type="hidden" name="cancel" value="1">
+                                                <input type="hidden" name="id" value="<?php echo (int)$row['id']; ?>">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm"><i class="fas fa-times"></i> Cancel</button>
+                                            </form>
                                         <?php else: ?>
                                             <span class="text-muted small">—</span>
                                         <?php endif; ?>

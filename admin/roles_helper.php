@@ -42,7 +42,7 @@ function getAdminRole($conn) {
     
     if ($q && mysqli_num_rows($q) > 0) {
         $r = mysqli_fetch_assoc($q);
-        return $r['role'] ?: 'Admin';
+        return ems_canonical_admin_role($r['role'] ?: 'Admin');
     }
     return 'Admin';
 }

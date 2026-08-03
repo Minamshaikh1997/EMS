@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once("../config/security.php");
+ems_start_secure_session();
 include("../config/db.php");
 
 // Only Super Admin (CEO) can run this
@@ -8,10 +9,16 @@ if (!isset($_SESSION['admin'])) {
     exit();
 }
 
+if (($_SESSION['admin_role'] ?? '') !== 'Super Admin') {
+    http_response_code(403);
+    exit('Only Super Admin can run role setup.');
+}
+
 $message = "";
 $error = "";
 
 if (isset($_POST['run_setup'])) {
+    ems_verify_csrf();
     
     // ==========================================
     // 1. Add new columns to employees table
@@ -104,7 +111,8 @@ $hierarchyRows = mysqli_query($conn, "SELECT * FROM role_hierarchy ORDER BY hier
             <?php if ($message) echo "<div class='alert alert-success'>$message</div>"; ?>
             <?php if ($error) echo "<div class='alert alert-danger'>$error</div>"; ?>
             
-            <form method="POST">
+<form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(ems_csrf_token()) ?>">
                 <div class="alert alert-warning">
                     <strong>⚠️ Important:</strong> This will set up the role hierarchy system. 
                     Make sure you have a database backup before running.

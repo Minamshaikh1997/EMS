@@ -2,7 +2,7 @@
 session_start();
 include("admincheck_role.php");
 include("../config/db.php");
-include("../config/permissions.php");
+include_once("../config/permissions.php");
 
 // Only Super Admin can modify permissions
 if (!isSuperAdmin()) {
@@ -12,10 +12,7 @@ if (!isSuperAdmin()) {
 
 // Save permissions
 if (isset($_POST['save_permissions'])) {
-    // Validate CSRF token
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        die("Invalid CSRF token");
-    }
+    ems_verify_csrf();
     
     // Start transaction
     mysqli_begin_transaction($conn);
@@ -74,9 +71,7 @@ if (isset($_POST['save_permissions'])) {
 }
 
 // Generate CSRF token
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
+$csrf_token = ems_csrf_token();
 
 // Get all roles from database
 $allRoles = getAllRoles($conn);
@@ -455,7 +450,7 @@ $module_categories = [
         </div>
         <div class="card-body p-0">
             <form method="POST" id="permissionsForm">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                 
                 <div class="table-responsive">
                     <table class="table table-bordered mb-0">
