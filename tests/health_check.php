@@ -32,7 +32,13 @@ foreach (['config/security.php', 'config/audit.php', 'config/page_permissions.ph
     checkResult(is_file($root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $file)), "Required security file: $file");
 }
 
-$requiredTables = ['admin', 'employees', 'attendance', 'attendance_adjustments', 'leave_requests', 'payroll', 'security_audit_log', 'shift_history', 'auth_login_attempts', 'roles', 'permissions', 'role_permissions'];
+$requiredTables = [
+    'admin', 'employees', 'attendance', 'attendance_adjustments', 'attendance_status_requests',
+    'leave_requests', 'payroll', 'employee_requisitions', 'employee_requisition_approvals',
+    'performance_campaigns', 'campaign_kpis', 'employee_campaign_assignments',
+    'campaign_performance', 'campaign_performance_scores', 'employee_kpi_performance', 'mis_adjustments',
+    'security_audit_log', 'shift_history', 'auth_login_attempts', 'roles', 'permissions', 'role_permissions',
+];
 foreach ($requiredTables as $table) {
     $stmt = $conn->prepare('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?');
     $stmt->bind_param('s', $table);
@@ -67,7 +73,19 @@ foreach ($requiredAdjustmentColumns as $column) {
     $stmt->close();
 }
 
-$knownAdminRoles = ['Super Admin','Admin','Operations Manager','WFM Executive','Finance Manager','Accountant','Supervisor','Team Lead'];
+$requiredAttendanceColumns = ['status_locked', 'status_updated_by', 'status_updated_at'];
+foreach ($requiredAttendanceColumns as $column) {
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='attendance' AND column_name=?");
+    $stmt->bind_param('s', $column);
+    $stmt->execute();
+    checkResult((int)$stmt->get_result()->fetch_row()[0] === 1, "Attendance status column: $column");
+    $stmt->close();
+}
+
+$attendanceStatusType = $conn->query("SELECT column_type FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='attendance' AND column_name='status'")->fetch_row()[0] ?? '';
+checkResult(str_contains($attendanceStatusType, "'Off Day'") && str_contains($attendanceStatusType, "'NH'"), 'Attendance day statuses installed');
+
+$knownAdminRoles = ['Super Admin','Admin','Operations Manager','VP','Senior Assistant Manager','Assistant Manager','WFM Executive','Finance Manager','Accountant','Supervisor','Team Lead'];
 $unknownAdminRoles = [];
 $adminRoles = $conn->query('SELECT DISTINCT role FROM admin');
 while ($adminRole = $adminRoles->fetch_assoc()) {
@@ -91,6 +109,7 @@ checkResult(scalar($conn, 'SELECT COUNT(*) FROM leave_requests l LEFT JOIN emplo
 checkResult(scalar($conn, 'SELECT COUNT(*) FROM leave_balance l LEFT JOIN employees e ON e.id=l.employee_id WHERE e.id IS NULL') === 0, 'No orphan leave balances');
 checkResult(scalar($conn, 'SELECT COUNT(*) FROM payroll p LEFT JOIN employees e ON e.id=p.employee_id WHERE e.id IS NULL') === 0, 'No orphan payroll records');
 checkResult(scalar($conn, 'SELECT COUNT(*) FROM attendance_adjustments a LEFT JOIN employees e ON e.id=a.employee_id WHERE e.id IS NULL') === 0, 'No orphan attendance adjustment records');
+checkResult(scalar($conn, 'SELECT COUNT(*) FROM employee_requisition_approvals a LEFT JOIN employee_requisitions r ON r.id=a.requisition_id WHERE r.id IS NULL') === 0, 'No orphan requisition approvals');
 checkResult(scalar($conn, 'SELECT COUNT(*) FROM (SELECT employee_id,attendance_date FROM attendance GROUP BY employee_id,attendance_date HAVING COUNT(*)>1) duplicates') === 0, 'No duplicate daily attendance');
 
 $payrollIndex = scalar($conn, "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='payroll' AND index_name='uq_payroll_employee_period'");

@@ -33,6 +33,12 @@ Get-Content database\2026_08_03_login_attempts.sql -Raw | C:\xampp\mysql\bin\mys
 Get-Content database\2026_08_03_salary_integrity.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
 Get-Content database\2026_08_03_role_permission_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
 Get-Content database\2026_08_04_attendance_adjustment_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_05_employee_requisitions.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_05_attendance_status_requests.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_05_attendance_status_lock.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_05_attendance_day_statuses.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_09_requisition_role_permissions.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
+Get-Content database\2026_08_09_performance_mis_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root employee_leave_system
 ```
 
 The alignment migration is safe to run repeatedly and preserves existing employee records.
@@ -52,6 +58,7 @@ Run the read-only automated database and security check:
 ```powershell
 C:\xampp\php\php.exe tests\health_check.php
 C:\xampp\php\php.exe tests\auth_rate_limit_test.php
+C:\xampp\php\php.exe tests\workflow_integrity_test.php
 C:\xampp\php\php.exe tests\deployment_readiness.php
 ```
 

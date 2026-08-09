@@ -36,6 +36,9 @@ INSERT IGNORE INTO roles (role_name,role_slug,description,hierarchy_level) VALUE
 ('Super Admin','super_admin','Full system access',1),
 ('Admin','admin','Administrative access',2),
 ('Operations Manager','operations_manager','Operations and employee management',3),
+('VP','vp','Executive requisition approval',3),
+('Senior Assistant Manager','senior_assistant_manager','Second-stage requisition approval',4),
+('Assistant Manager','assistant_manager','First-stage requisition approval',5),
 ('WFM Executive','wfm_executive','Attendance and workforce management',3),
 ('Finance Manager','finance_manager','Payroll and finance management',3),
 ('Accountant','accountant','Payroll processing support',4),
@@ -56,6 +59,7 @@ INSERT IGNORE INTO role_permissions (role_id,permission_id,module_name)
 SELECT r.id,p.id,m.module_name
 FROM roles r CROSS JOIN permissions p CROSS JOIN (
     SELECT 'dashboard' module_name UNION ALL SELECT 'employee_management' UNION ALL
+    SELECT 'requisitions' UNION ALL
     SELECT 'attendance' UNION ALL SELECT 'leave_management' UNION ALL SELECT 'payroll' UNION ALL
     SELECT 'department' UNION ALL SELECT 'reports' UNION ALL SELECT 'notifications' UNION ALL
     SELECT 'settings' UNION ALL SELECT 'user_management' UNION ALL SELECT 'role_permission'
@@ -66,6 +70,7 @@ INSERT IGNORE INTO role_permissions (role_id,permission_id,module_name)
 SELECT r.id,p.id,m.module_name
 FROM roles r CROSS JOIN permissions p CROSS JOIN (
     SELECT 'dashboard' module_name UNION ALL SELECT 'employee_management' UNION ALL
+    SELECT 'requisitions' UNION ALL
     SELECT 'attendance' UNION ALL SELECT 'leave_management' UNION ALL SELECT 'payroll' UNION ALL
     SELECT 'department' UNION ALL SELECT 'reports' UNION ALL SELECT 'notifications' UNION ALL
     SELECT 'settings' UNION ALL SELECT 'user_management'
@@ -101,3 +106,10 @@ INSERT IGNORE INTO role_permissions (role_id,permission_id,module_name)
 SELECT r.id,p.id,g.module_name FROM roles r JOIN (
  SELECT 'dashboard' module_name,'view' permission_slug UNION ALL SELECT 'employee_management','view' UNION ALL SELECT 'attendance','view' UNION ALL SELECT 'leave_management','view'
 ) g JOIN permissions p ON p.permission_slug=g.permission_slug WHERE r.role_name='Team Lead';
+
+-- Requisition reviewers receive only the access needed for their approval step.
+INSERT IGNORE INTO role_permissions (role_id,permission_id,module_name)
+SELECT r.id,p.id,'requisitions'
+FROM roles r
+JOIN permissions p ON p.permission_slug IN ('view','approve')
+WHERE r.role_name IN ('Assistant Manager','Senior Assistant Manager','Operations Manager','VP');

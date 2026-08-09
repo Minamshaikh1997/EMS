@@ -304,6 +304,7 @@ function getAllModules() {
         'dashboard' => 'Dashboard',
         'employee_management' => 'Employee Management',
         'attendance' => 'Attendance',
+        'requisitions' => 'Requisitions',
         'leave_management' => 'Leave Management',
         'payroll' => 'Payroll',
         'department' => 'Department',

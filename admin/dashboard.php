@@ -316,6 +316,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
         <a href="employee.php" class="sidebar-link"><i class="fa fa-users"></i> Employees</a>
         <a href="add_employee.php" class="sidebar-link"><i class="fa fa-user-plus"></i> Add Employee</a>
         <a href="employee_rights_management.php" class="sidebar-link"><i class="fa fa-user-shield"></i> Employee Rights</a>
+        <a href="requisitions.php" class="sidebar-link"><i class="fa fa-file-circle-plus"></i> Requisitions</a>
         <a href="leave_requests.php" class="sidebar-link"><i class="fa fa-calendar-check"></i> Leave Requests</a>
         <a href="supervisor_adjustments.php" class="sidebar-link"><i class="fa fa-user-tie"></i> Supervisor Adjustments</a>
         <a href="admin_adjustments.php" class="sidebar-link"><i class="fa fa-shield-alt"></i> Admin Adjustments</a>
@@ -342,6 +343,7 @@ while($r = mysqli_fetch_assoc($deptChart)){ $labels[] = $r['department'] ?: 'Una
         <a href="add_holiday.php" class="sidebar-link"><i class="fa fa-plane"></i> Holidays</a>
         <a href="send_email.php" class="sidebar-link"><i class="fa fa-envelope"></i> Send Email</a>
         <?php if (in_array($admin_role, ['Super Admin', 'Admin'], true)): ?><a href="security_audit.php" class="sidebar-link"><i class="fa fa-shield-halved"></i> Security Audit</a><?php endif; ?>
+        <?php if ($admin_role === 'Super Admin'): ?><a href="access_control.php" class="sidebar-link"><i class="fa fa-sliders"></i> Access Control</a><?php endif; ?>
         <a href="change_password.php" class="sidebar-link"><i class="fa fa-key"></i> Change Password</a>
         <a href="logout.php" class="sidebar-link"><i class="fa fa-right-from-bracket"></i> Logout</a>
         </div>

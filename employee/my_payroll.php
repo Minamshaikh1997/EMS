@@ -360,6 +360,8 @@ if ($salary_slips) {
 .dark-mode .slip-detail-value { color: #e2e8f0; }
 .dark-mode .structure-item { background: rgba(255,255,255,.04); }
 .dark-mode .structure-item-label { color: var(--gray-400); }
+.slip-actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+.slip-actions .btn { font-weight:650; border-radius:9px; }
 
 @media (max-width: 768px) {
     .welcome-banner { padding: 24px; }
@@ -577,6 +579,14 @@ if ($salary_slips) {
                         <div class="slip-total">
                             <span class="slip-total-label">Net Salary</span>
                             <span class="slip-total-value">Rs. <?php echo number_format($slip['net_salary'] ?? 0, 2); ?></span>
+                        </div>
+                        <div class="slip-actions">
+                            <a class="btn btn-outline-primary btn-sm" href="../admin/print_salary_slip.php?id=<?=(int)$slip['id']?>">
+                                <i class="fa fa-print me-1"></i> Print
+                            </a>
+                            <a class="btn btn-success btn-sm" href="../admin/export_salary_slip.php?id=<?=(int)$slip['id']?>">
+                                <i class="fa fa-file-arrow-down me-1"></i> Export PDF
+                            </a>
                         </div>
                     </div>
                     <?php endwhile; ?>

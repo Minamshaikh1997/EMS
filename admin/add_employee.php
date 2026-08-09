@@ -40,6 +40,7 @@ if(isset($_POST['save']))
     $department = trim((string)($_POST['department'] ?? ''));
     $designation = trim((string)($_POST['designation'] ?? ''));
     $joining_date = trim((string)($_POST['joining_date'] ?? ''));
+    $employment_type = trim((string)($_POST['employment_type'] ?? 'Permanent'));
     $shift_name = !empty($_POST['shift_name']) ? trim((string)$_POST['shift_name']) : 'Morning';
     $shift_start_time = !empty($_POST['shift_start_time']) ? trim((string)$_POST['shift_start_time']) : '09:00';
     $shift_end_time = !empty($_POST['shift_end_time']) ? trim((string)$_POST['shift_end_time']) : '17:00';
@@ -51,7 +52,7 @@ if(isset($_POST['save']))
     $passwordError = ems_password_validation_error($password_raw);
     if (!preg_match('/^[A-Za-z0-9_-]{1,20}$/',$employee_id) || $full_name === '' || strlen($full_name)>100 || !filter_var($email,FILTER_VALIDATE_EMAIL)
         || !in_array($role,$manageableRoles,true) || $department==='' || strlen($department)>100 || $designation==='' || strlen($designation)>100
-        || !preg_match('/^\d{4}-\d{2}-\d{2}$/',$joining_date) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_start_time)
+        || !preg_match('/^\d{4}-\d{2}-\d{2}$/',$joining_date) || !in_array($employment_type,['Permanent','Contract','Probation','Intern','Part-time','Consultant'],true) || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_start_time)
         || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/',$shift_end_time) || !in_array($status,['Active','Inactive','Suspended','Terminated'],true) || $passwordError) {
         $error = $passwordError ?: 'Please provide valid employee details.';
     }
@@ -101,9 +102,9 @@ if(isset($_POST['save']))
         $annual=7;$sick=10;$casual=10;
         mysqli_begin_transaction($conn);
         try {
-            $stmt=$conn->prepare('INSERT INTO employees (employee_id,full_name,email,password,role,photo,department,designation,joining_date,shift_name,shift_start_time,shift_end_time,annual_leave,sick_leave,casual_leave,is_active,status,reporting_manager_id,reporting_supervisor_id,reporting_team_lead_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-            $types=str_repeat('s',12).'iiii'.'s'.'iii';
-            $stmt->bind_param($types,$employee_id,$full_name,$email,$password,$role,$photo,$department,$designation,$joining_date,$shift_name,$shift_start_time,$shift_end_time,$annual,$sick,$casual,$is_active,$status,$reporting_manager_id,$reporting_supervisor_id,$reporting_team_lead_id);
+            $stmt=$conn->prepare('INSERT INTO employees (employee_id,full_name,email,password,role,photo,department,designation,joining_date,employment_type,shift_name,shift_start_time,shift_end_time,annual_leave,sick_leave,casual_leave,is_active,status,reporting_manager_id,reporting_supervisor_id,reporting_team_lead_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+            $types=str_repeat('s',13).'iiii'.'s'.'iii';
+            $stmt->bind_param($types,$employee_id,$full_name,$email,$password,$role,$photo,$department,$designation,$joining_date,$employment_type,$shift_name,$shift_start_time,$shift_end_time,$annual,$sick,$casual,$is_active,$status,$reporting_manager_id,$reporting_supervisor_id,$reporting_team_lead_id);
             $stmt->execute();
             $newEmployeeId = mysqli_insert_id($conn);
             $stmt->close();
@@ -289,7 +290,7 @@ $teamLeads = $allEmployees;
                             <select name="role" class="form-select" required>
                                 <option value="">Select Role</option>
                                 <?php
-                                $allRoles = ['Operations Manager','Supervisor','Team Lead','WFM Executive','Finance Manager','Accountant','Employee'];
+                                $allRoles = ['Operations Manager','Senior Assistant Manager','Assistant Manager','Supervisor','Team Lead','WFM Executive','Finance Manager','Accountant','Employee'];
                                 foreach ($allRoles as $r) {
                                     if (empty($manageableRoles) || in_array($r, $manageableRoles)) {
                                         echo "<option value=\"$r\">$r</option>";
@@ -309,6 +310,17 @@ $teamLeads = $allEmployees;
                                 <option value="Inactive">Inactive</option>
                                 <option value="Suspended">Suspended</option>
                                 <option value="Terminated">Terminated</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                            <select name="employment_type" class="form-select" required>
+                                <option value="Permanent" selected>Permanent</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Probation">Probation</option>
+                                <option value="Intern">Intern</option>
+                                <option value="Part-time">Part-time</option>
+                                <option value="Consultant">Consultant</option>
                             </select>
                         </div>
                     </div>

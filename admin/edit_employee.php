@@ -42,7 +42,8 @@ if(isset($_POST['update']))
         'status' => $row['status'] ?? '',
         'department' => $row['department'] ?? '',
         'designation' => $row['designation'] ?? '',
-        'role' => $row['role'] ?? ''
+        'role' => $row['role'] ?? '',
+        'employment_type' => $row['employment_type'] ?? 'Permanent'
     ];
     $employee_id   = trim((string)($_POST['employee_id'] ?? ''));
     $full_name     = trim((string)($_POST['full_name'] ?? ''));
@@ -51,6 +52,7 @@ if(isset($_POST['update']))
     $department    = trim((string)($_POST['department'] ?? ''));
     $designation   = trim((string)($_POST['designation'] ?? ''));
     $joining_date  = trim((string)($_POST['joining_date'] ?? ''));
+    $employment_type = trim((string)($_POST['employment_type'] ?? 'Permanent'));
     $shift_name    = !empty($_POST['shift_name']) ? trim((string)$_POST['shift_name']) : 'Morning';
     $shift_start_time = !empty($_POST['shift_start_time']) ? trim((string)$_POST['shift_start_time']) : '09:00';
     $shift_end_time   = !empty($_POST['shift_end_time']) ? trim((string)$_POST['shift_end_time']) : '17:00';
@@ -66,6 +68,7 @@ if(isset($_POST['update']))
     if ($employee_id === '' || trim($full_name) === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)
         || !array_key_exists($role, $ROLE_HIERARCHY)
         || !in_array($status, ['Active', 'Inactive', 'Suspended', 'Terminated'], true)
+        || !in_array($employment_type, ['Permanent','Contract','Probation','Intern','Part-time','Consultant'], true)
         || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $joining_date)
         || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $shift_start_time)
         || !preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $shift_end_time)) {
@@ -92,14 +95,14 @@ if(isset($_POST['update']))
     $canEditProfile = $rights['can_edit_profile'];
     $canViewReports = $rights['can_view_reports'];
     $canChangePassword = $rights['can_change_password'];
-    $stmt = $conn->prepare('UPDATE employees SET employee_id=?,full_name=?,email=?,role=?,department=?,designation=?,joining_date=?,shift_name=?,shift_start_time=?,shift_end_time=?,annual_leave=?,sick_leave=?,casual_leave=?,status=?,is_active=?,reporting_manager_id=?,reporting_supervisor_id=?,reporting_team_lead_id=?,can_view_payroll=?,can_apply_leave=?,can_view_attendance=?,can_submit_adjustment=?,can_edit_profile=?,can_view_reports=?,can_change_password=? WHERE id=?');
-    $types = str_repeat('s', 10) . 'iii' . 's' . str_repeat('i', 12);
-    $stmt->bind_param($types, $employee_id, $full_name, $email, $role, $department, $designation, $joining_date, $shift_name, $shift_start_time, $shift_end_time, $annual_leave, $sick_leave, $casual_leave, $status, $is_active, $reporting_manager_id, $reporting_supervisor_id, $reporting_team_lead_id, $can_view_payroll, $canApplyLeave, $canViewAttendance, $canSubmitAdjustment, $canEditProfile, $canViewReports, $canChangePassword, $id);
+    $stmt = $conn->prepare('UPDATE employees SET employee_id=?,full_name=?,email=?,role=?,department=?,designation=?,joining_date=?,employment_type=?,shift_name=?,shift_start_time=?,shift_end_time=?,annual_leave=?,sick_leave=?,casual_leave=?,status=?,is_active=?,reporting_manager_id=?,reporting_supervisor_id=?,reporting_team_lead_id=?,can_view_payroll=?,can_apply_leave=?,can_view_attendance=?,can_submit_adjustment=?,can_edit_profile=?,can_view_reports=?,can_change_password=? WHERE id=?');
+    $types = str_repeat('s', 11) . 'iii' . 's' . str_repeat('i', 12);
+    $stmt->bind_param($types, $employee_id, $full_name, $email, $role, $department, $designation, $joining_date, $employment_type, $shift_name, $shift_start_time, $shift_end_time, $annual_leave, $sick_leave, $casual_leave, $status, $is_active, $reporting_manager_id, $reporting_supervisor_id, $reporting_team_lead_id, $can_view_payroll, $canApplyLeave, $canViewAttendance, $canSubmitAdjustment, $canEditProfile, $canViewReports, $canChangePassword, $id);
     $updated = $stmt->execute();
     $stmt->close();
 
     if ($updated && employeeManagementSchemaReady($conn)) {
-        $newSnapshot = ['status' => $status, 'department' => $department, 'designation' => $designation, 'role' => $role];
+        $newSnapshot = ['status' => $status, 'department' => $department, 'designation' => $designation, 'role' => $role, 'employment_type' => $employment_type];
         logEmployeeHistory($conn, $id, 'Profile Updated', json_encode($oldSnapshot), json_encode($newSnapshot), 'Core job and access details updated.');
         if ($oldSnapshot['status'] !== $status) {
             logEmployeeHistory($conn, $id, 'Status Changed', $oldSnapshot['status'], $status, null);
@@ -337,7 +340,7 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
                             <label class="form-label">Role</label>
                             <select name="role" class="form-select" required>
                                 <?php
-                                $allRoles = ['Super Admin','Admin','Operations Manager','Supervisor','Team Lead','WFM Executive','Finance Manager','Accountant','Employee'];
+                                $allRoles = ['Super Admin','Admin','VP','Operations Manager','Senior Assistant Manager','Assistant Manager','Supervisor','Team Lead','WFM Executive','Finance Manager','Accountant','Employee'];
                                 $currentRole = $row['role'] ?? 'Employee';
                                 if (!in_array($currentRole, $allRoles)) {
                                     $allRoles[] = $currentRole;
@@ -377,6 +380,14 @@ body.dark-mode { background: #0f172a; color: #e2e8f0; }
                         <div class="col-md-4">
                             <label class="form-label">Joining Date</label>
                             <input type="date" name="joining_date" class="form-control" value="<?php echo $row['joining_date']; ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Employment Type</label>
+                            <select name="employment_type" class="form-select" required>
+                                <?php foreach(['Permanent','Contract','Probation','Intern','Part-time','Consultant'] as $employmentType): ?>
+                                    <option value="<?=htmlspecialchars($employmentType)?>" <?=(($row['employment_type'] ?? 'Permanent') === $employmentType) ? 'selected' : ''?>><?=htmlspecialchars($employmentType)?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
 

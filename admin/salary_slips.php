@@ -289,6 +289,9 @@ $salarySlips = mysqli_query($conn, "
                                         <a href="print_salary_slip.php?id=<?php echo $row['id']; ?>" class="btn btn-info btn-sm">
                                             <i class="fa fa-print"></i>
                                         </a>
+                                        <a href="export_salary_slip.php?id=<?php echo (int)$row['id']; ?>" class="btn btn-success btn-sm" title="Export PDF" aria-label="Export PDF">
+                                            <i class="fa fa-file-arrow-down"></i> PDF
+                                        </a>
                                         <form method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary slip?');"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(ems_csrf_token())?>"><button name="delete" value="<?=(int)$row['id']?>" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></form>
                                     </td>
                                 </tr>

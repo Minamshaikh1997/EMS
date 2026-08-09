@@ -1,6 +1,7 @@
 <?php
 session_start();
 include("../config/db.php");
+include_once("../config/audit.php");
 
 if (!isset($_SESSION['admin'])) {
     header("Location: ../index.html");
@@ -24,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['adj
     $adj_id = intval($_POST['adj_id']);
     $comment = mysqli_real_escape_string($conn, $_POST['comment'] ?? '');
     $action = $_POST['action'];
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     
     $adj = mysqli_query($conn, "SELECT * FROM attendance_adjustments WHERE id='$adj_id'");
     if (mysqli_num_rows($adj) === 0) {
@@ -75,8 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['adj
                 supervisor_date=NOW()
                 WHERE id='$adj_id'");
             
-            mysqli_query($conn, "INSERT INTO audit_log (action_type, description, performed_by, performed_by_role, target_id, target_type, ip_address) 
-                VALUES ('Supervisor $action_desc Adjustment', 'Supervisor $action_desc adjustment request #$adj_id', '$admin_name', 'Supervisor', '$adj_id', 'attendance_adjustments', '$ip')");
+            ems_audit($conn, 'attendance_adjustment.supervisor_' . strtolower(str_replace(' ', '_', $action_desc)), 'attendance_adjustment', $adj_id, [
+                'status' => $new_status,
+                'comment' => (string)($_POST['comment'] ?? ''),
+            ]);
             
             $success = "Adjustment request $action_desc successfully.";
         }

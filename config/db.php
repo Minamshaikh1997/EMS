@@ -17,7 +17,10 @@ $isLocalHost = in_array($requestHost, ['localhost', '127.0.0.1', '::1', '[::1]']
 $serverAddress = (string)($_SERVER['SERVER_ADDR'] ?? '');
 $isLoopbackServer = in_array($serverAddress, ['127.0.0.1', '::1'], true);
 $isProduction = $appEnvironment === 'production';
-$useLocalDatabase = !$isProduction && (PHP_SAPI === 'cli' || ($isLocalHost && $isLoopbackServer));
+// A Cloudflare quick tunnel preserves its public Host header while proxying to
+// this local Apache instance. The loopback server address proves the request
+// reached local XAMPP; production mode still always requires EMS_DB_* values.
+$useLocalDatabase = !$isProduction && (PHP_SAPI === 'cli' || $isLocalHost || $isLoopbackServer);
 
 if ($isProduction) {
     ini_set('display_errors', '0');

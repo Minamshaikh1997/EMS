@@ -62,6 +62,8 @@ if (isset($_POST['run_setup'])) {
         ['Super Admin', 1, 'Full system access. Can manage all users, settings, and data.'],
         ['Admin', 2, 'Managing Director. Manages departments, managers, employees. Cannot modify Super Admin.'],
         ['Operations Manager', 3, 'Manages Supervisors and Team Leads under assigned departments.'],
+        ['Senior Assistant Manager', 4, 'Second management review for employee requisitions.'],
+        ['Assistant Manager', 5, 'First management review for employee requisitions.'],
         ['WFM Executive', 3, 'Workforce Management. Manages attendance, shifts, schedules.'],
         ['Finance Manager', 3, 'Manages payroll and salary. Cannot manage users or attendance.'],
         ['Accountant', 4, 'Assists with payroll processing.'],

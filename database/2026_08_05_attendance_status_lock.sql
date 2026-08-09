@@ -1,0 +1,4 @@
+ALTER TABLE attendance
+    ADD COLUMN IF NOT EXISTS status_locked TINYINT(1) NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS status_updated_by INT NULL,
+    ADD COLUMN IF NOT EXISTS status_updated_at DATETIME NULL;

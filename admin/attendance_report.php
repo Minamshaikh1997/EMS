@@ -8,50 +8,144 @@ if(!isset($_SESSION['admin']))
 }
 
 include("../config/db.php");
+include("admincheck_role.php");
 
-$search = "";
-$from = "";
-$to = "";
-
-$sql = "SELECT
-attendance.*,
-employees.full_name,
-employees.department
-FROM attendance
-LEFT JOIN employees
-ON attendance.employee_id=employees.id
-WHERE 1=1";
-
-if(isset($_GET['filter']))
-{
-    $search = mysqli_real_escape_string($conn,$_GET['search']);
-    $from = $_GET['from'];
-    $to = $_GET['to'];
-
-    if($search!="")
-    {
-        $sql .= " AND (
-        employees.full_name LIKE '%$search%'
-        OR employees.employee_id LIKE '%$search%'
-        )";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['review_status_request'])) {
+    ems_verify_csrf();
+    $requestId=(int)($_POST['request_id']??0); $decision=$_POST['decision']??''; $comment=trim($_POST['review_comment']??'');
+    if (in_array($decision,['Approved','Rejected'],true)) {
+        mysqli_begin_transaction($conn);
+        $q=mysqli_prepare($conn,"SELECT * FROM attendance_status_requests WHERE id=? AND status='Pending' FOR UPDATE"); mysqli_stmt_bind_param($q,'i',$requestId); mysqli_stmt_execute($q); $request=mysqli_fetch_assoc(mysqli_stmt_get_result($q));
+        if ($request && ((int)$request['incharge_id']===(int)($_SESSION['admin_id']??0) || $admin_role==='Super Admin')) {
+            if ($decision==='Approved') { $approvedStatus=$request['requested_status'];$allowedStatuses=['Present','Absent','Late','Half Day','Early Out','Off Day','NH'];if(!in_array($approvedStatus,$allowedStatuses,true)){mysqli_rollback($conn);header('Location: attendance_report.php?status_error=invalid');exit();}$reviewerId=(int)($_SESSION['admin_id']??0);$approvedAttendanceId=(int)$request['attendance_id'];$u=mysqli_prepare($conn,'UPDATE attendance SET status=?,status_locked=1,status_updated_by=?,status_updated_at=NOW() WHERE id=? AND status_locked=0'); mysqli_stmt_bind_param($u,'sii',$approvedStatus,$reviewerId,$approvedAttendanceId); mysqli_stmt_execute($u);if(mysqli_stmt_affected_rows($u)!==1){mysqli_rollback($conn);header('Location: attendance_report.php?status_error=locked');exit();} }
+            $u=mysqli_prepare($conn,'UPDATE attendance_status_requests SET status=?,review_comment=?,reviewed_at=NOW() WHERE id=?'); mysqli_stmt_bind_param($u,'ssi',$decision,$comment,$requestId); mysqli_stmt_execute($u);
+            mysqli_commit($conn);
+        } else mysqli_rollback($conn);
     }
-
-    if($from!="" && $to!="")
-    {
-        $sql .= " AND attendance_date BETWEEN '$from' AND '$to'";
-    }
+    header('Location: attendance_report.php'); exit();
 }
 
-$sql .= " ORDER BY attendance_date DESC, employees.full_name ASC";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_day_status'])) {
+    ems_verify_csrf();
+    $allowedAttendanceStatuses = ['Present','Absent','Late','Half Day','Early Out','Off Day','NH'];
+    $updatedBy = (int)($_SESSION['admin_id'] ?? 0);
+    $submittedStatuses = $_POST['statuses'] ?? [];
+    if (is_array($submittedStatuses)) {
+        $stmt = mysqli_prepare($conn, "UPDATE attendance SET status=?,status_locked=1,status_updated_by=?,status_updated_at=NOW() WHERE id=? AND status_locked=0");
+        foreach ($submittedStatuses as $attendanceId => $dayStatus) {
+            $attendanceId = (int)$attendanceId;
+            $dayStatus = trim((string)$dayStatus);
+            if ($attendanceId < 1 || !in_array($dayStatus, $allowedAttendanceStatuses, true)) continue;
+            if ($admin_role==='Super Admin') {
+                mysqli_stmt_bind_param($stmt, 'sii', $dayStatus, $updatedBy, $attendanceId); mysqli_stmt_execute($stmt);
+            } else {
+                $roleOrder=['Employee','Team Lead','Supervisor','Assistant Manager','Senior Assistant Manager','Operations Manager','VP','Admin','Super Admin'];
+                $currentIndex=array_search($admin_role,$roleOrder,true); $candidateRoles=$currentIndex===false?['Super Admin']:array_slice($roleOrder,$currentIndex+1);
+                $incharge=null;
+                foreach($candidateRoles as $candidateRole){$iq=mysqli_prepare($conn,'SELECT id,name FROM admin WHERE role=? ORDER BY id LIMIT 1');mysqli_stmt_bind_param($iq,'s',$candidateRole);mysqli_stmt_execute($iq);$incharge=mysqli_fetch_assoc(mysqli_stmt_get_result($iq));if($incharge)break;}
+                if(!$incharge){$iq=mysqli_query($conn,"SELECT id,name FROM admin WHERE role IN ('CEO','Super Admin','Admin') ORDER BY id LIMIT 1");$incharge=$iq?mysqli_fetch_assoc($iq):null;}
+                if($incharge){$requesterName=$_SESSION['admin_name']??$_SESSION['admin']??'User';$inchargeId=(int)$incharge['id'];$inchargeName=$incharge['name'];$rq=mysqli_prepare($conn,"INSERT INTO attendance_status_requests(attendance_id,requested_status,requested_by,requested_by_name,incharge_id,incharge_name) SELECT ?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM attendance_status_requests WHERE attendance_id=? AND status='Pending')");mysqli_stmt_bind_param($rq,'isiissi',$attendanceId,$dayStatus,$updatedBy,$requesterName,$inchargeId,$inchargeName,$attendanceId);mysqli_stmt_execute($rq);}
+            }
+        }
+    }
+    $returnQuery = http_build_query(array_filter([
+        'filter' => $_POST['return_filter'] ?? '',
+        'search' => $_POST['return_search'] ?? '',
+        'from' => $_POST['return_from'] ?? '',
+        'to' => $_POST['return_to'] ?? '',
+        'department' => $_POST['return_department'] ?? '',
+        'employee_id' => $_POST['return_employee_id'] ?? '',
+        'month' => $_POST['return_month'] ?? '',
+        'year' => $_POST['return_year'] ?? '',
+        'inactive' => $_POST['return_inactive'] ?? '',
+        'view_mode' => $_POST['return_view_mode'] ?? '',
+    ], static fn($value) => $value !== ''));
+    header('Location: attendance_report.php' . ($returnQuery ? '?' . $returnQuery : ''));
+    exit();
+}
 
-$result = mysqli_query($conn,$sql);
+$search = trim((string)($_GET['search'] ?? ''));
+$department = trim((string)($_GET['department'] ?? ''));
+$selectedEmployee = max(0, (int)($_GET['employee_id'] ?? 0));
+$selectedMonth = min(12, max(1, (int)($_GET['month'] ?? date('n'))));
+$selectedYear = min((int)date('Y') + 1, max(2020, (int)($_GET['year'] ?? date('Y'))));
+$includeInactive = isset($_GET['inactive']) && $_GET['inactive'] === '1';
+$requestedViewMode = (string)($_GET['view_mode'] ?? 'payroll');
+$viewMode = in_array($requestedViewMode, ['payroll','month'], true) ? $requestedViewMode : 'payroll';
+$from = sprintf('%04d-%02d-01', $selectedYear, $selectedMonth);
+$to = date('Y-m-t', strtotime($from));
 
-// Get total counts for summary cards
-$totalPresent = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM attendance a JOIN employees e ON a.employee_id=e.id WHERE a.status='Present' " . (($from && $to) ? "AND a.attendance_date BETWEEN '$from' AND '$to'" : "")))['c'];
-$totalAbsent = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM attendance a JOIN employees e ON a.employee_id=e.id WHERE a.status='Absent' " . (($from && $to) ? "AND a.attendance_date BETWEEN '$from' AND '$to'" : "")))['c'];
-$totalLate = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM attendance a JOIN employees e ON a.employee_id=e.id WHERE a.status='Late' " . (($from && $to) ? "AND a.attendance_date BETWEEN '$from' AND '$to'" : "")))['c'];
-$totalHalfDay = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM attendance a JOIN employees e ON a.employee_id=e.id WHERE a.status='Half Day' " . (($from && $to) ? "AND a.attendance_date BETWEEN '$from' AND '$to'" : "")))['c'];
-$totalRecords = mysqli_num_rows($result);
+$companyName = 'Employee Management System';
+try { $companyQuery=$conn->query('SELECT company_name FROM company_settings WHERE id=1 LIMIT 1'); if($companyQuery&&($companyRow=$companyQuery->fetch_assoc()))$companyName=trim((string)$companyRow['company_name'])?:$companyName; } catch(Throwable $ignored) {}
+$departmentsList=[]; $departmentQuery=$conn->query("SELECT DISTINCT department FROM employees WHERE department IS NOT NULL AND department<>'' ORDER BY department"); while($departmentQuery&&($d=$departmentQuery->fetch_assoc()))$departmentsList[]=$d['department'];
+$employeeList=[]; $employeeQuery=$conn->query('SELECT id,employee_id,full_name,department,status,is_active FROM employees ORDER BY full_name'); while($employeeQuery&&($e=$employeeQuery->fetch_assoc()))$employeeList[]=$e;
+
+$sql = "SELECT attendance.*,employees.employee_id AS emp_code,employees.full_name,employees.department,employees.shift_start_time,employees.shift_end_time FROM attendance JOIN employees ON attendance.employee_id=employees.id WHERE attendance.attendance_date BETWEEN ? AND ?";
+$types='ss'; $params=[$from,$to];
+if(!$includeInactive){$sql.=" AND employees.status='Active' AND employees.is_active=1";}
+if($department!==''){$sql.=' AND employees.department=?';$types.='s';$params[]=$department;}
+if($selectedEmployee>0){$sql.=' AND employees.id=?';$types.='i';$params[]=$selectedEmployee;}
+if($search!==''){$like='%'.$search.'%';$sql.=' AND (employees.full_name LIKE ? OR employees.employee_id LIKE ?)';$types.='ss';$params[]=$like;$params[]=$like;}
+$sql .= $viewMode==='month' ? ' ORDER BY employees.full_name,attendance.attendance_date' : ' ORDER BY attendance.attendance_date,employees.full_name';
+$reportStmt=$conn->prepare($sql);$reportStmt->bind_param($types,...$params);$reportStmt->execute();$result=$reportStmt->get_result();
+
+$reportRows = $result->fetch_all(MYSQLI_ASSOC);
+$existingDates = [];
+foreach ($reportRows as $attendanceIndex => &$attendanceRow) {
+    $attendanceRow['is_leave'] = false;
+    $existingDates[$attendanceRow['employee_id'] . '|' . $attendanceRow['attendance_date']] = $attendanceIndex;
+}
+unset($attendanceRow);
+
+// Include each applied leave date in the attendance report, without duplicating an attendance row.
+$leaveSql = "SELECT lr.id AS leave_id,lr.employee_id,lr.leave_type,lr.start_date,lr.end_date,lr.status AS leave_status,
+                    e.employee_id AS emp_code,e.full_name,e.department,e.shift_start_time,e.shift_end_time
+             FROM leave_requests lr JOIN employees e ON e.id=lr.employee_id
+             WHERE lr.status<>'Rejected' AND lr.start_date<=? AND lr.end_date>=?";
+$leaveTypes = 'ss'; $leaveParams = [$to, $from];
+if (!$includeInactive) $leaveSql .= " AND e.status='Active' AND e.is_active=1";
+if ($department !== '') { $leaveSql .= ' AND e.department=?'; $leaveTypes .= 's'; $leaveParams[] = $department; }
+if ($selectedEmployee > 0) { $leaveSql .= ' AND e.id=?'; $leaveTypes .= 'i'; $leaveParams[] = $selectedEmployee; }
+if ($search !== '') { $like = '%' . $search . '%'; $leaveSql .= ' AND (e.full_name LIKE ? OR e.employee_id LIKE ?)'; $leaveTypes .= 'ss'; $leaveParams[] = $like; $leaveParams[] = $like; }
+$leaveStmt = $conn->prepare($leaveSql); $leaveStmt->bind_param($leaveTypes, ...$leaveParams); $leaveStmt->execute();
+$leaveResult = $leaveStmt->get_result();
+while ($leave = $leaveResult->fetch_assoc()) {
+    $leaveStart = max(strtotime($from), strtotime($leave['start_date']));
+    $leaveEnd = min(strtotime($to), strtotime($leave['end_date']));
+    for ($day = $leaveStart; $day <= $leaveEnd; $day = strtotime('+1 day', $day)) {
+        $leaveDate = date('Y-m-d', $day);
+        $key = $leave['employee_id'] . '|' . $leaveDate;
+        if (isset($existingDates[$key])) {
+            $existingIndex = $existingDates[$key];
+            $reportRows[$existingIndex]['is_leave'] = true;
+            $reportRows[$existingIndex]['leave_type'] = $leave['leave_type'];
+            $reportRows[$existingIndex]['leave_status'] = $leave['leave_status'];
+            continue;
+        }
+        $reportRows[] = array_merge($leave, [
+            'id'=>0, 'attendance_date'=>$leaveDate, 'check_in'=>null, 'check_out'=>null,
+            'working_hours'=>null, 'status'=>'Leave', 'status_locked'=>1, 'is_leave'=>true
+        ]);
+        $existingDates[$key] = array_key_last($reportRows);
+    }
+}
+usort($reportRows, static function(array $a, array $b) use ($viewMode): int {
+    $left = $viewMode === 'month' ? $a['full_name'].'|'.$a['attendance_date'] : $a['attendance_date'].'|'.$a['full_name'];
+    $right = $viewMode === 'month' ? $b['full_name'].'|'.$b['attendance_date'] : $b['attendance_date'].'|'.$b['full_name'];
+    return strcasecmp($left, $right);
+});
+
+// Keep summary cards aligned with every selected report filter.
+$totalPresent = $totalAbsent = $totalLate = $totalHalfDay = 0;
+foreach ($reportRows as $summaryRow) {
+    $summaryStatus = strtolower(trim((string)($summaryRow['status'] ?? '')));
+    if ($summaryStatus === 'present') $totalPresent++;
+    elseif ($summaryStatus === 'absent') $totalAbsent++;
+    elseif ($summaryStatus === 'late') $totalLate++;
+    elseif ($summaryStatus === 'half day') $totalHalfDay++;
+}
+$totalRecords = count($reportRows);
+$pendingForMe=[]; $pendingStmt=mysqli_prepare($conn,"SELECT sr.*,a.attendance_date,e.full_name,e.department FROM attendance_status_requests sr JOIN attendance a ON a.id=sr.attendance_id JOIN employees e ON e.id=a.employee_id WHERE sr.status='Pending' AND (sr.incharge_id=? OR ?='Super Admin') ORDER BY sr.id DESC"); mysqli_stmt_bind_param($pendingStmt,'is',$adminIdForPending,$admin_role); $adminIdForPending=(int)($_SESSION['admin_id']??0); mysqli_stmt_execute($pendingStmt); $pendingForMe=mysqli_fetch_all(mysqli_stmt_get_result($pendingStmt),MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -474,13 +568,20 @@ body.dark-mode {
 <!-- Page Container -->
 <div class="page-container">
 
+    <?php if(($_GET['status_error'] ?? '') === 'locked'): ?>
+        <div class="alert alert-warning">This attendance record was already locked or changed. The request remains pending and was not falsely approved.</div>
+    <?php elseif(($_GET['status_error'] ?? '') === 'invalid'): ?>
+        <div class="alert alert-danger">The requested attendance status is invalid. No data was changed.</div>
+    <?php endif; ?>
+
     <!-- Page Header -->
     <div class="page-header">
         <h2><i class="fa-solid fa-clock"></i> Attendance Report <small>/ Track employee attendance</small></h2>
         <div class="d-flex gap-2 flex-wrap">
             <a href="attendance_control.php" class="btn btn-primary rounded-pill px-4"><i class="fa fa-calendar-check"></i> Control & Lock</a>
             <a href="attendance_policy.php" class="btn btn-outline-primary rounded-pill px-4"><i class="fa fa-sliders"></i> Policy</a>
-            <a href="export_excel.php" class="btn btn-success rounded-pill px-4"><i class="fa fa-file-excel"></i> Export Excel</a>
+            <?php $exportQuery = http_build_query(['department'=>$department,'employee_id'=>$selectedEmployee,'month'=>$selectedMonth,'year'=>$selectedYear,'inactive'=>$includeInactive?'1':'0','view_mode'=>$viewMode,'search'=>$search]); ?>
+            <a href="export_attendance.php?<?=htmlspecialchars($exportQuery, ENT_QUOTES, 'UTF-8')?>" class="btn btn-success rounded-pill px-4"><i class="fa fa-file-excel"></i> Export Excel</a>
         </div>
     </div>
 
@@ -523,26 +624,28 @@ body.dark-mode {
         </div>
     </div>
 
+    <?php if($pendingForMe): ?>
+    <div class="filter-card border-warning">
+        <div class="filter-title"><i class="fa-solid fa-user-check"></i> Status Requests Awaiting Your Approval</div>
+        <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Employee</th><th>Date</th><th>Requested Status</th><th>Requested By</th><th>Decision</th></tr></thead><tbody>
+        <?php foreach($pendingForMe as $pending): ?><tr><td><strong><?=htmlspecialchars($pending['full_name'])?></strong><small class="d-block text-muted"><?=htmlspecialchars($pending['department'])?></small></td><td><?=date('d-m-Y',strtotime($pending['attendance_date']))?></td><td><span class="badge bg-warning text-dark"><?=htmlspecialchars($pending['requested_status'])?></span></td><td><?=htmlspecialchars($pending['requested_by_name'])?></td><td><form method="post" class="d-flex gap-2"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(ems_csrf_token())?>"><input type="hidden" name="review_status_request" value="1"><input type="hidden" name="request_id" value="<?=(int)$pending['id']?>"><input name="review_comment" class="form-control form-control-sm" placeholder="Comment"><button name="decision" value="Approved" class="btn btn-sm btn-success">Approve</button><button name="decision" value="Rejected" class="btn btn-sm btn-outline-danger">Reject</button></form></td></tr><?php endforeach; ?>
+        </tbody></table></div>
+    </div>
+    <?php endif; ?>
+
     <!-- Filter Card -->
-    <div class="filter-card">
-        <div class="filter-title"><i class="fa-solid fa-filter"></i> Filter Records</div>
-        <form method="GET" class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Employee Name / ID</label>
-                <input type="text" name="search" class="form-control" placeholder="Search by name or ID..." value="<?php echo $search; ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">From Date</label>
-                <input type="date" name="from" class="form-control" value="<?php echo $from; ?>">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">To Date</label>
-                <input type="date" name="to" class="form-control" value="<?php echo $to; ?>">
-            </div>
-            <div class="col-md-2 d-flex align-items-end gap-2">
-                <button type="submit" name="filter" class="btn btn-primary w-100 rounded-pill"><i class="fa fa-search"></i> Filter</button>
-                <a href="attendance_report.php" class="btn btn-outline-secondary rounded-pill w-100"><i class="fa fa-undo"></i></a>
-            </div>
+    <div class="filter-card" style="background:linear-gradient(135deg,#edfafa,#f7fbff);border-color:#b8e8e4">
+        <div class="filter-title"><i class="fa-solid fa-filter"></i> Attendance Report Filters</div>
+        <form method="GET" class="row g-3 align-items-end">
+            <input type="hidden" name="filter" value="1">
+            <div class="col-xl-2 col-md-4"><label class="form-label">Company Name</label><select class="form-select" disabled><option><?=htmlspecialchars($companyName)?></option></select></div>
+            <div class="col-xl-2 col-md-4"><label class="form-label">Department Name</label><select name="department" id="departmentFilter" class="form-select"><option value="">-Select-</option><?php foreach($departmentsList as $dept):?><option value="<?=htmlspecialchars($dept)?>" <?=$department===$dept?'selected':''?>><?=htmlspecialchars($dept)?></option><?php endforeach;?></select></div>
+            <div class="col-xl-2 col-md-4"><label class="form-label">Employee Name</label><select name="employee_id" id="employeeFilter" class="form-select"><option value="">-Select Employee-</option><?php foreach($employeeList as $employeeOption):?><option value="<?=(int)$employeeOption['id']?>" data-department="<?=htmlspecialchars($employeeOption['department'])?>" <?=($selectedEmployee===(int)$employeeOption['id'])?'selected':''?>><?=htmlspecialchars($employeeOption['employee_id'].' - '.$employeeOption['full_name'])?></option><?php endforeach;?></select></div>
+            <div class="col-xl-2 col-md-4"><label class="form-label">Month</label><select name="month" class="form-select"><?php for($monthNo=1;$monthNo<=12;$monthNo++):?><option value="<?=$monthNo?>" <?=$selectedMonth===$monthNo?'selected':''?>><?=date('F',mktime(0,0,0,$monthNo,1))?></option><?php endfor;?></select></div>
+            <div class="col-xl-2 col-md-4"><label class="form-label">Year</label><select name="year" class="form-select"><?php for($yearNo=(int)date('Y')+1;$yearNo>=2020;$yearNo--):?><option value="<?=$yearNo?>" <?=$selectedYear===$yearNo?'selected':''?>><?=$yearNo?></option><?php endfor;?></select></div>
+            <div class="col-xl-1 col-md-2"><label class="form-label d-block">InActive</label><div class="form-check form-switch py-2"><input class="form-check-input" type="checkbox" name="inactive" value="1" <?=$includeInactive?'checked':''?>></div></div>
+            <div class="col-xl-5 col-md-7"><div class="d-flex gap-4 py-2"><label class="form-check-label fw-semibold"><input type="radio" name="view_mode" value="payroll" <?=$viewMode==='payroll'?'checked':''?>> Payroll Wise</label><label class="form-check-label fw-semibold"><input type="radio" name="view_mode" value="month" <?=$viewMode==='month'?'checked':''?>> Month Wise</label></div></div>
+            <div class="col-xl-7 col-md-5 text-end"><button type="submit" class="btn btn-success px-4"><i class="fa fa-search me-1"></i> Search</button> <a href="attendance_report.php" class="btn btn-outline-secondary px-3"><i class="fa fa-rotate-left"></i> Reset</a></div>
         </form>
     </div>
 
@@ -556,33 +659,44 @@ body.dark-mode {
             <table class="table table-modern">
                 <thead>
                     <tr>
+                        <th>Sr. No.</th>
                         <th>Employee</th>
                         <th>Department</th>
                         <th>Date</th>
                         <th>Check In</th>
                         <th>Check Out</th>
                         <th>Working Hours</th>
+                        <th>Required Hours</th>
                         <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php if(mysqli_num_rows($result) > 0): ?>
-                    <?php while($row = mysqli_fetch_assoc($result)){
+                <?php if($totalRecords > 0): ?>
+                    <?php $serialNo = 0; foreach($reportRows as $row){
                         $badgeClass = 'badge-absent';
                         $statusLabel = $row['status'] ?: 'Absent';
+                        $requiredMinutes = 480;
+                        if (!empty($row['shift_start_time']) && !empty($row['shift_end_time'])) {
+                            $shiftStart = strtotime('2000-01-01 ' . $row['shift_start_time']);
+                            $shiftEnd = strtotime('2000-01-01 ' . $row['shift_end_time']);
+                            if ($shiftEnd <= $shiftStart) $shiftEnd = strtotime('+1 day', $shiftEnd);
+                            $requiredMinutes = max(0, (int)(($shiftEnd - $shiftStart) / 60));
+                        }
+                        $requiredHours = sprintf('%02d:%02d', intdiv($requiredMinutes, 60), $requiredMinutes % 60);
                         if($row['status'] == 'Present') $badgeClass = 'badge-present';
                         elseif($row['status'] == 'Late') $badgeClass = 'badge-late';
                         elseif($row['status'] == 'Half Day') $badgeClass = 'badge-halfday';
                         elseif($row['status'] == 'Early Out') $badgeClass = 'badge-earlyout';
-                        elseif($row['status'] == 'Absent' || empty($row['status'])) $badgeClass = 'badge-absent';
+                        elseif(in_array($row['status'], ['Absent','Off Day','NH'], true) || empty($row['status'])) $badgeClass = 'badge-absent';
                     ?>
                     <tr>
+                        <td><?=++$serialNo?></td>
                         <td>
                             <div class="emp-info">
                                 <div class="emp-avatar"><?php echo strtoupper(substr($row['full_name'], 0, 1)); ?></div>
                                 <div class="emp-details">
                                     <div class="emp-name"><?php echo htmlspecialchars($row['full_name']); ?></div>
-                                    <div class="emp-dept">ID: <?php echo htmlspecialchars($row['employee_id']); ?></div>
+                                    <div class="emp-dept">ID: <?php echo htmlspecialchars($row['emp_code']); ?></div>
                                 </div>
                             </div>
                         </td>
@@ -609,11 +723,28 @@ body.dark-mode {
                                 <span class="time-empty">—</span>
                             <?php endif; ?>
                         </td>
-                        <td><span class="badge-modern <?php echo $badgeClass; ?>"><?php echo $statusLabel; ?></span></td>
+                        <td class="time-cell"><?php echo htmlspecialchars($requiredHours); ?></td>
+                        <td>
+                            <?php if(!empty($row['is_leave'])): ?>
+                            <span class="badge-modern badge-present"><?=htmlspecialchars($row['leave_type'])?> Leave</span>
+                            <small class="d-block text-muted mt-1"><?=htmlspecialchars($row['leave_status'])?></small>
+                            <?php elseif(empty($row['status_locked'])): ?>
+                            <div class="d-flex align-items-center gap-2">
+                                <select data-field-name="statuses[<?=(int)$row['id']?>]" form="batchStatusForm" class="form-select form-select-sm attendance-status-select" style="min-width:105px" onchange="this.name=this.dataset.fieldName;this.classList.add('border-warning')">
+                                    <?php foreach(['Present','Absent','Late','Half Day','Early Out','Off Day','NH'] as $option): ?>
+                                    <option value="<?=$option?>" <?=$row['status']===$option?'selected':''?>><?=$option?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <?php else: ?>
+                            <span class="badge-modern <?php echo $badgeClass; ?>"><?php echo htmlspecialchars($statusLabel); ?></span>
+                            <small class="d-block text-muted mt-1"><i class="fa fa-lock"></i> Saved</small>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php } ?>
                 <?php else: ?>
-                    <tr><td colspan="7" class="text-center py-5 text-muted">
+                    <tr><td colspan="9" class="text-center py-5 text-muted">
                         <i class="fa-regular fa-calendar" style="font-size: 36px; display: block; margin-bottom: 10px;"></i>
                         No attendance records found
                     </td></tr>
@@ -625,11 +756,45 @@ body.dark-mode {
             <span class="text-muted" style="font-size: 13px;">
                 <i class="fa-regular fa-clock"></i> Showing attendance records
             </span>
-            <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
+            <div class="d-flex gap-2">
+                <form method="post" id="batchStatusForm" onsubmit="return confirm('<?= $admin_role==='Super Admin'?'Save and lock the selected statuses?':'Send the selected status changes to your in-charge for approval?' ?>');">
+                    <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(ems_csrf_token())?>">
+                    <input type="hidden" name="update_day_status" value="1">
+                    <input type="hidden" name="return_filter" value="<?=isset($_GET['filter'])?'1':''?>">
+                    <input type="hidden" name="return_search" value="<?=htmlspecialchars($search)?>">
+                    <input type="hidden" name="return_from" value="<?=htmlspecialchars($from)?>">
+                    <input type="hidden" name="return_to" value="<?=htmlspecialchars($to)?>">
+                    <input type="hidden" name="return_department" value="<?=htmlspecialchars($department)?>">
+                    <input type="hidden" name="return_employee_id" value="<?=$selectedEmployee?>">
+                    <input type="hidden" name="return_month" value="<?=$selectedMonth?>">
+                    <input type="hidden" name="return_year" value="<?=$selectedYear?>">
+                    <input type="hidden" name="return_inactive" value="<?=$includeInactive?'1':''?>">
+                    <input type="hidden" name="return_view_mode" value="<?=htmlspecialchars($viewMode)?>">
+                    <button type="submit" class="btn btn-success"><i class="fa fa-save"></i> <?= $admin_role==='Super Admin'?'Save Statuses':'Send for Approval' ?></button>
+                </form>
+                <a href="dashboard.php" class="btn btn-primary"><i class="fa fa-arrow-left"></i> Back to Dashboard</a>
+            </div>
         </div>
     </div>
 
 </div>
-
+<script>
+(function(){
+    const department=document.getElementById('departmentFilter');
+    const employee=document.getElementById('employeeFilter');
+    if(!department||!employee)return;
+    const filterEmployees=()=>{
+        const selectedDepartment=department.value;
+        Array.from(employee.options).forEach((option,index)=>{
+            if(index===0)return;
+            option.hidden=selectedDepartment!==''&&option.dataset.department!==selectedDepartment;
+        });
+        const selected=employee.options[employee.selectedIndex];
+        if(selected&&selected.hidden)employee.value='';
+    };
+    department.addEventListener('change',filterEmployees);
+    filterEmployees();
+})();
+</script>
 </body>
 </html>

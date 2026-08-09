@@ -21,8 +21,11 @@ $employeeShift = mysqli_fetch_assoc(mysqli_query($conn, "SELECT shift_name, shif
 $shiftStartRaw = $employeeShift['shift_start_time'] ?: '09:00:00';
 $shiftEndRaw = $employeeShift['shift_end_time'] ?: '17:00:00';
 [$shiftStartAt, $shiftEndAt] = shiftWindow($today, $shiftStartRaw, $shiftEndRaw);
-// After midnight, an open overnight shift belongs to the previous attendance date.
-if ($shiftEndAt->format('Y-m-d') !== $today && $now < $shiftEndAt && $now->format('H:i:s') < $shiftEndRaw) {
+// Before an overnight shift's early check-in window, attendance still belongs
+// to the previous shift date. This also correctly handles shifts ending 00:00.
+$isOvernightShift = $shiftEndRaw <= $shiftStartRaw;
+$todayEarlyCheckInAt = (clone $shiftStartAt)->modify('-' . (int)$policy['allow_early_check_in_minutes'] . ' minutes');
+if ($isOvernightShift && $now < $todayEarlyCheckInAt) {
     $attendanceDate = (clone $now)->modify('-1 day')->format('Y-m-d');
     [$shiftStartAt, $shiftEndAt] = shiftWindow($attendanceDate, $shiftStartRaw, $shiftEndRaw);
 } else { $attendanceDate = $today; }
@@ -36,6 +39,18 @@ AND attendance_date='$attendanceDate'
 ");
 
 $row = mysqli_fetch_assoc($check);
+$viewingMissedCheckout = false;
+
+// Once today's shift is available, surface an older open record first so the
+// employee can close it; after checkout the current shift's Check In appears.
+if (!$row) {
+    $staleStmt = $conn->prepare("SELECT * FROM attendance WHERE employee_id=? AND attendance_date<? AND check_in IS NOT NULL AND check_in<>'' AND (check_out IS NULL OR check_out='') ORDER BY attendance_date DESC,id DESC LIMIT 1");
+    $staleStmt->bind_param('is', $employee_id, $attendanceDate);
+    $staleStmt->execute();
+    $row = $staleStmt->get_result()->fetch_assoc();
+    $staleStmt->close();
+    $viewingMissedCheckout = (bool)$row;
+}
 
 // =======================
 // CHECK IN
@@ -44,6 +59,8 @@ if(isset($_POST['check_in']))
 {
     if (!verifyAttendanceCsrf()) { http_response_code(419); exit('Invalid security token.'); }
     if ($periodLocked) { header('Location: attendance.php?error=period_locked'); exit(); }
+    $earliestCheckIn = (clone $shiftStartAt)->modify('-' . (int)$policy['allow_early_check_in_minutes'] . ' minutes');
+    if ($now < $earliestCheckIn) { header('Location: attendance.php?error=too_early'); exit(); }
     $already = mysqli_query($conn,"
     SELECT * FROM attendance
     WHERE employee_id='$employee_id'
@@ -73,18 +90,21 @@ if(isset($_POST['check_in']))
 if(isset($_POST['check_out']))
 {
     if (!verifyAttendanceCsrf()) { http_response_code(419); exit('Invalid security token.'); }
-    if ($periodLocked) { header('Location: attendance.php?error=period_locked'); exit(); }
-    $attendance = mysqli_fetch_assoc(mysqli_query($conn,"
-    SELECT * FROM attendance
-    WHERE employee_id='$employee_id'
-    AND attendance_date='$attendanceDate'
-    "));
+    $attendanceId = (int)($_POST['attendance_id'] ?? 0);
+    $attendanceStmt = $conn->prepare('SELECT * FROM attendance WHERE id=? AND employee_id=? LIMIT 1');
+    $attendanceStmt->bind_param('ii', $attendanceId, $employee_id);
+    $attendanceStmt->execute();
+    $attendance = $attendanceStmt->get_result()->fetch_assoc();
+    $attendanceStmt->close();
 
     if($attendance)
     {
+        if (attendancePeriodLocked($conn, $attendance['attendance_date'])) { header('Location: attendance.php?error=period_locked'); exit(); }
         if (!empty($attendance['is_locked'])) { header('Location: attendance.php?error=locked'); exit(); }
-        $checkInAt = !empty($attendance['check_in_at']) ? new DateTime($attendance['check_in_at']) : new DateTime($attendanceDate.' '.$attendance['check_in']);
-        $metrics = attendanceMetrics($checkInAt, $now, $shiftStartAt, $shiftEndAt, $policy);
+        $recordDate = $attendance['attendance_date'];
+        [$recordShiftStart, $recordShiftEnd] = shiftWindow($recordDate, $shiftStartRaw, $shiftEndRaw);
+        $checkInAt = !empty($attendance['check_in_at']) ? new DateTime($attendance['check_in_at']) : new DateTime($recordDate.' '.$attendance['check_in']);
+        $metrics = attendanceMetrics($checkInAt, $now, $recordShiftStart, $recordShiftEnd, $policy);
         $hours = intdiv($metrics['worked'], 60); $minutes = $metrics['worked'] % 60;
         $workingHours = $hours." Hours ".$minutes." Minutes";
         $checkOutAt=$now->format('Y-m-d H:i:s');
@@ -92,7 +112,7 @@ if(isset($_POST['check_out']))
         mysqli_query($conn,"
         UPDATE attendance
         SET check_out='$currentTime', check_out_at='$checkOutAt', working_hours='$workingHours', work_minutes='{$metrics['worked']}', late_minutes='{$metrics['late']}', early_out_minutes='{$metrics['early']}', overtime_minutes='{$metrics['overtime']}', status='{$metrics['status']}'
-        WHERE employee_id='$employee_id' AND attendance_date='$attendanceDate' AND is_locked=0
+        WHERE id='$attendanceId' AND employee_id='$employee_id' AND is_locked=0
         ");
     }
 
@@ -107,6 +127,15 @@ WHERE employee_id='$employee_id'
 AND attendance_date='$attendanceDate'
 ");
 $row = mysqli_fetch_assoc($check);
+$viewingMissedCheckout = false;
+if (!$row) {
+    $staleStmt = $conn->prepare("SELECT * FROM attendance WHERE employee_id=? AND attendance_date<? AND check_in IS NOT NULL AND check_in<>'' AND (check_out IS NULL OR check_out='') ORDER BY attendance_date DESC,id DESC LIMIT 1");
+    $staleStmt->bind_param('is', $employee_id, $attendanceDate);
+    $staleStmt->execute();
+    $row = $staleStmt->get_result()->fetch_assoc();
+    $staleStmt->close();
+    $viewingMissedCheckout = (bool)$row;
+}
 
 // Get recent attendance history (last 7 days)
 $recentHistory = mysqli_query($conn, "
@@ -622,6 +651,14 @@ body.dark-mode {
     </div>
 
     <!-- Main Attendance Card -->
+    <?php if(($_GET['error'] ?? '') === 'too_early'): ?>
+        <div class="alert alert-warning"><i class="fa fa-clock me-2"></i>Check In will be available within <?=(int)$policy['allow_early_check_in_minutes']?> minutes before your shift starts.</div>
+    <?php elseif(($_GET['error'] ?? '') === 'period_locked' || ($_GET['error'] ?? '') === 'locked'): ?>
+        <div class="alert alert-danger"><i class="fa fa-lock me-2"></i>This attendance period is locked. Please contact your administrator.</div>
+    <?php endif; ?>
+    <?php if($viewingMissedCheckout): ?>
+        <div class="alert alert-warning"><i class="fa fa-triangle-exclamation me-2"></i>Your checkout for <?=htmlspecialchars(date('d M Y', strtotime($row['attendance_date'])))?> is missing. Close that shift first; today's Check In will then become available.</div>
+    <?php endif; ?>
     <div class="attendance-card">
         <div class="ac-header">
             <span class="ac-title"><i class="fa-solid fa-clipboard-check"></i> Today's Attendance</span>
@@ -672,6 +709,7 @@ body.dark-mode {
                 <div class="action-group">
                     <form method="POST">
                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($attendanceCsrf); ?>">
+                        <input type="hidden" name="attendance_id" value="<?=(int)$row['id']?>">
                         <button type="submit" name="check_out" class="btn-large btn-check-out">
                             <i class="fa-solid fa-right-from-bracket"></i> Check Out
                         </button>
